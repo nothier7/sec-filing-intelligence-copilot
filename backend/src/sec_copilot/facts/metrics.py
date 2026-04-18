@@ -38,6 +38,36 @@ METRIC_DEFINITIONS: tuple[MetricDefinition, ...] = (
         keywords=("operating income", "operating profit"),
     ),
     MetricDefinition(
+        key="operating_expenses",
+        label="operating expenses",
+        concepts=("OperatingExpenses",),
+        keywords=("operating expenses", "operating expense", "opex"),
+    ),
+    MetricDefinition(
+        key="research_and_development",
+        label="research and development expense",
+        concepts=("ResearchAndDevelopmentExpense",),
+        keywords=("research and development", "r&d", "research development"),
+    ),
+    MetricDefinition(
+        key="selling_general_and_administrative",
+        label="selling, general and administrative expense",
+        concepts=("SellingGeneralAndAdministrativeExpense", "GeneralAndAdministrativeExpense"),
+        keywords=(
+            "selling general and administrative",
+            "selling, general and administrative",
+            "sg&a",
+            "sga",
+            "general and administrative",
+        ),
+    ),
+    MetricDefinition(
+        key="cost_of_sales",
+        label="cost of sales",
+        concepts=("CostOfGoodsAndServicesSold", "CostOfRevenue"),
+        keywords=("cost of sales", "cost of revenue", "cost of goods", "costs"),
+    ),
+    MetricDefinition(
         key="assets",
         label="total assets",
         concepts=("Assets",),
@@ -72,6 +102,29 @@ METRIC_DEFINITIONS: tuple[MetricDefinition, ...] = (
         keywords=("capital expenditures", "capex", "capital expenditure"),
     ),
     MetricDefinition(
+        key="share_repurchases",
+        label="share repurchases",
+        concepts=("PaymentsForRepurchaseOfCommonStock",),
+        keywords=(
+            "share repurchases",
+            "share repurchase",
+            "stock repurchases",
+            "stock repurchase",
+            "buybacks",
+            "stock buybacks",
+        ),
+    ),
+    MetricDefinition(
+        key="dividends",
+        label="dividend payments",
+        concepts=(
+            "PaymentsOfDividends",
+            "PaymentsOfDividendsCommonStock",
+            "PaymentsOfDividendsAndDividendEquivalentsOnCommonStockAndRestrictedStockUnits",
+        ),
+        keywords=("dividends", "dividend payments", "paid dividends"),
+    ),
+    MetricDefinition(
         key="diluted_eps",
         label="diluted earnings per share",
         concepts=("EarningsPerShareDiluted",),
@@ -96,7 +149,7 @@ def match_metric(question: str) -> MetricDefinition | None:
 
 
 def _keyword_matches(text: str, tokens: set[str], keyword: str) -> bool:
-    if " " in keyword:
+    if " " in keyword or any(not character.isalnum() for character in keyword):
         return keyword in text
     return keyword in tokens
 

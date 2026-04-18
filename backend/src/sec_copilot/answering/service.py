@@ -17,6 +17,7 @@ from sec_copilot.answering.synthesis import (
     best_evidence_snippet,
     has_numeric_evidence,
     insufficient_evidence_answer,
+    metric_clarification_answer,
     synthesize_extractive_answer,
     synthesize_numeric_fact_answer,
     unsupported_answer,
@@ -97,7 +98,11 @@ class CitedAnswerService:
         if insufficient_reason is not None:
             return AskResponse(
                 question=request.question,
-                answer=insufficient_evidence_answer(),
+                answer=(
+                    metric_clarification_answer()
+                    if insufficient_reason == "no_metric_match"
+                    else insufficient_evidence_answer()
+                ),
                 query_type=query_type,
                 supported=False,
                 confidence=0.0,

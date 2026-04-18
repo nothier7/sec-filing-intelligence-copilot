@@ -43,6 +43,8 @@ NUMERIC_TERMS = {
     "debt",
     "dollars",
     "earnings",
+    "expense",
+    "expenses",
     "income",
     "margin",
     "many",
@@ -53,6 +55,9 @@ NUMERIC_TERMS = {
     "profit",
     "revenue",
     "sales",
+    "spend",
+    "spending",
+    "spent",
     "total",
     "value",
 }

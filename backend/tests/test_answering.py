@@ -19,6 +19,7 @@ FIXTURE_DIR = Path(__file__).parent / "fixtures" / "sec"
 def test_classify_query_types() -> None:
     assert classify_query("What are the main regulatory risks?") == QueryType.TEXT
     assert classify_query("How much revenue did the company report?") == QueryType.NUMERIC
+    assert classify_query("What were operating expenses?") == QueryType.NUMERIC
     assert classify_query("What changed compared with the prior filing?") == QueryType.COMPARISON
     assert classify_query("Should I buy this stock?") == QueryType.UNSUPPORTED
 
@@ -95,6 +96,57 @@ def test_cited_answer_service_uses_structured_xbrl_fact_for_numeric_answer(
     assert response.numeric_grounding[0].metric == "revenue"
     assert response.numeric_grounding[0].concept == "RevenueFromContractWithCustomerExcludingAssessedTax"
     assert response.numeric_grounding[0].value == "383,285,000,000"
+
+
+def test_cited_answer_service_asks_for_specific_spending_metric(session: Session) -> None:
+    _create_parsed_fixture_filing(session)
+
+    response = CitedAnswerService(
+        session=session,
+        embed_model=HashEmbedding(dimensions=32),
+    ).answer(
+        AskRequest(
+            accession_number="0000320193-24-000123",
+            question="How much did Apple spend in 2024?",
+            top_k=2,
+        )
+    )
+
+    assert response.supported is False
+    assert response.query_type == QueryType.NUMERIC
+    assert response.insufficient_evidence_reason == "no_metric_match"
+    assert "specific financial metric" in response.answer
+    assert "capital expenditures" in response.answer
+
+
+def test_cited_answer_service_uses_structured_spending_fact_for_specific_metric(
+    session: Session,
+) -> None:
+    filing_id = _create_parsed_fixture_filing(session)
+    _add_xbrl_fact(
+        session=session,
+        filing_id=filing_id,
+        concept="ResearchAndDevelopmentExpense",
+        label="Research and Development Expense",
+        value=Decimal("31370000000"),
+        source_suffix="rd-fy2024",
+    )
+
+    response = CitedAnswerService(
+        session=session,
+        embed_model=HashEmbedding(dimensions=32),
+    ).answer(
+        AskRequest(
+            accession_number="0000320193-24-000123",
+            question="How much did Apple spend on R&D in 2024?",
+            top_k=2,
+        )
+    )
+
+    assert response.supported is True
+    assert "31,370,000,000 USD" in response.answer
+    assert response.numeric_grounding[0].metric == "research_and_development"
+    assert response.numeric_grounding[0].concept == "ResearchAndDevelopmentExpense"
 
 
 def test_cited_answer_service_flags_numeric_fact_mismatch(session: Session) -> None:
@@ -247,19 +299,37 @@ def _create_parsed_fixture_filing(session: Session) -> int:
 
 
 def _add_revenue_fact(session: Session, filing_id: int) -> None:
+    _add_xbrl_fact(
+        session=session,
+        filing_id=filing_id,
+        concept="RevenueFromContractWithCustomerExcludingAssessedTax",
+        label="Revenue",
+        value=Decimal("383285000000"),
+        source_suffix="revenue-fy2024",
+    )
+
+
+def _add_xbrl_fact(
+    session: Session,
+    filing_id: int,
+    concept: str,
+    label: str,
+    value: Decimal,
+    source_suffix: str,
+) -> None:
     filing = FilingRepository(session).get(filing_id)
     assert filing is not None
     XbrlFactRepository(session).add(
         XbrlFact(
-            source_key=f"{filing.accession_number}-revenue-fy2024",
+            source_key=f"{filing.accession_number}-{source_suffix}",
             company_id=filing.company_id,
             filing_id=filing.id,
             cik=filing.cik,
             accession_number=filing.accession_number,
-            concept="RevenueFromContractWithCustomerExcludingAssessedTax",
-            label="Revenue",
+            concept=concept,
+            label=label,
             unit="USD",
-            value=Decimal("383285000000"),
+            value=value,
             fiscal_period="FY",
             fiscal_year=2024,
             form_type=filing.form_type,

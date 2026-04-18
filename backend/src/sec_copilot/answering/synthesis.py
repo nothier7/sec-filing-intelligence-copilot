@@ -100,6 +100,15 @@ def insufficient_evidence_answer() -> str:
     return "I do not have enough filing evidence to answer that confidently."
 
 
+def metric_clarification_answer() -> str:
+    return (
+        "I need a more specific financial metric before I can answer that from SEC facts. "
+        "Try asking about operating expenses, R&D expense, SG&A expense, capital "
+        "expenditures, share repurchases, dividends, revenue, net income, or operating "
+        "cash flow."
+    )
+
+
 def unsupported_answer() -> str:
     return (
         "I cannot answer investment advice, forecasts, or questions outside the selected "
