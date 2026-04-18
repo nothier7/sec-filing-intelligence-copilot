@@ -64,6 +64,16 @@ make db-upgrade
 
 Milestone 2 tests use SQLite in memory, so the persistence layer can be verified without Docker.
 
+### SEC Ingestion
+
+After running migrations against a configured database, ingest one company by CIK:
+
+```bash
+.venv/bin/sec-copilot ingest-sec-company 320193 --limit 2
+```
+
+The command fetches SEC submissions, selected 10-K/10-Q filing documents, and company facts. Raw SEC artifacts are cached under `SEC_RAW_DATA_DIR`, which defaults to `data/raw/sec` and is intentionally ignored by git.
+
 ### Frontend
 
 ```bash

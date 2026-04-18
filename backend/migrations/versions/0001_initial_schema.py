@@ -144,6 +144,7 @@ def upgrade() -> None:
     op.create_table(
         "xbrl_facts",
         sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("source_key", sa.String(length=64), nullable=False),
         sa.Column("company_id", sa.Integer(), nullable=False),
         sa.Column("filing_id", sa.Integer(), nullable=True),
         sa.Column("cik", sa.String(length=10), nullable=False),
@@ -164,6 +165,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["filing_id"], ["filings.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
+    op.create_index(op.f("ix_xbrl_facts_source_key"), "xbrl_facts", ["source_key"], unique=True)
     op.create_index(op.f("ix_xbrl_facts_accession_number"), "xbrl_facts", ["accession_number"], unique=False)
     op.create_index("ix_xbrl_facts_accession_concept", "xbrl_facts", ["accession_number", "concept"], unique=False)
     op.create_index(op.f("ix_xbrl_facts_cik"), "xbrl_facts", ["cik"], unique=False)
@@ -173,6 +175,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_index(op.f("ix_xbrl_facts_source_key"), table_name="xbrl_facts")
     op.drop_index(op.f("ix_xbrl_facts_fiscal_year"), table_name="xbrl_facts")
     op.drop_index(op.f("ix_xbrl_facts_concept"), table_name="xbrl_facts")
     op.drop_index("ix_xbrl_facts_company_concept_period", table_name="xbrl_facts")
@@ -199,4 +202,3 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_companies_ticker"), table_name="companies")
     op.drop_index(op.f("ix_companies_cik"), table_name="companies")
     op.drop_table("companies")
-

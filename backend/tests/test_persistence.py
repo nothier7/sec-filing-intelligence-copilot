@@ -1,14 +1,10 @@
-from collections.abc import Generator
 from datetime import date, datetime
 from decimal import Decimal
 
-import pytest
-from sqlalchemy import create_engine, inspect
-from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy import inspect
+from sqlalchemy.orm import Session
 
 from sec_copilot.db.models import (
-    Base,
     BenchmarkQuestion,
     Chunk,
     Company,
@@ -25,22 +21,6 @@ from sec_copilot.repositories import (
     FilingRepository,
     XbrlFactRepository,
 )
-
-
-@pytest.fixture()
-def session() -> Generator[Session, None, None]:
-    engine = create_engine(
-        "sqlite+pysqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    session_factory = sessionmaker(bind=engine, expire_on_commit=False)
-
-    with session_factory() as db_session:
-        yield db_session
-
-    Base.metadata.drop_all(engine)
 
 
 def test_schema_contains_core_tables(session: Session) -> None:
@@ -124,6 +104,7 @@ def test_xbrl_fact_repository_filters_by_period(session: Session) -> None:
     fact_repository = XbrlFactRepository(session)
     fact = fact_repository.add(
         XbrlFact(
+            source_key="msft-revenues-2024-fy",
             company_id=company.id,
             cik=company.cik,
             concept="Revenues",
@@ -181,4 +162,3 @@ def test_benchmark_question_and_eval_run_repositories(session: Session) -> None:
     assert list(question_repository.list_by_type("section_lookup")) == [question]
     assert eval_repository.get("eval-2026-04-18-naive") == eval_run
     assert list(eval_repository.list_by_variant("naive_rag")) == [eval_run]
-

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import date
+from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import Select, select
@@ -26,6 +28,35 @@ class CompanyRepository:
         self.session.flush()
         return company
 
+    def upsert_by_cik(
+        self,
+        cik: str,
+        name: str,
+        ticker: Optional[str] = None,
+        exchange: Optional[str] = None,
+        sic: Optional[str] = None,
+        fiscal_year_end: Optional[str] = None,
+    ) -> Company:
+        company = self.get_by_cik(cik)
+        if company is None:
+            company = Company(
+                cik=cik,
+                ticker=ticker,
+                name=name,
+                exchange=exchange,
+                sic=sic,
+                fiscal_year_end=fiscal_year_end,
+            )
+            return self.add(company)
+
+        company.name = name
+        company.ticker = ticker
+        company.exchange = exchange
+        company.sic = sic
+        company.fiscal_year_end = fiscal_year_end
+        self.session.flush()
+        return company
+
     def get_by_cik(self, cik: str) -> Optional[Company]:
         return self.session.execute(select(Company).where(Company.cik == cik)).scalar_one_or_none()
 
@@ -44,6 +75,47 @@ class FilingRepository:
 
     def add(self, filing: Filing) -> Filing:
         self.session.add(filing)
+        self.session.flush()
+        return filing
+
+    def upsert_by_accession_number(
+        self,
+        company_id: int,
+        accession_number: str,
+        cik: str,
+        form_type: str,
+        filing_date: date,
+        source_url: str,
+        report_date: Optional[date] = None,
+        fiscal_year: Optional[int] = None,
+        fiscal_quarter: Optional[int] = None,
+        raw_artifact_path: Optional[str] = None,
+    ) -> Filing:
+        filing = self.get_by_accession_number(accession_number)
+        if filing is None:
+            filing = Filing(
+                company_id=company_id,
+                accession_number=accession_number,
+                cik=cik,
+                form_type=form_type,
+                filing_date=filing_date,
+                report_date=report_date,
+                fiscal_year=fiscal_year,
+                fiscal_quarter=fiscal_quarter,
+                source_url=source_url,
+                raw_artifact_path=raw_artifact_path,
+            )
+            return self.add(filing)
+
+        filing.company_id = company_id
+        filing.cik = cik
+        filing.form_type = form_type
+        filing.filing_date = filing_date
+        filing.report_date = report_date
+        filing.fiscal_year = fiscal_year
+        filing.fiscal_quarter = fiscal_quarter
+        filing.source_url = source_url
+        filing.raw_artifact_path = raw_artifact_path
         self.session.flush()
         return filing
 
@@ -108,6 +180,67 @@ class XbrlFactRepository:
         self.session.flush()
         return fact
 
+    def get_by_source_key(self, source_key: str) -> Optional[XbrlFact]:
+        return self.session.execute(
+            select(XbrlFact).where(XbrlFact.source_key == source_key)
+        ).scalar_one_or_none()
+
+    def upsert_by_source_key(
+        self,
+        source_key: str,
+        company_id: int,
+        cik: str,
+        concept: str,
+        unit: str,
+        value: Decimal,
+        filing_id: Optional[int] = None,
+        accession_number: Optional[str] = None,
+        label: Optional[str] = None,
+        fiscal_period: Optional[str] = None,
+        fiscal_year: Optional[int] = None,
+        fiscal_quarter: Optional[int] = None,
+        form_type: Optional[str] = None,
+        filed_date: Optional[date] = None,
+        frame: Optional[str] = None,
+    ) -> XbrlFact:
+        fact = self.get_by_source_key(source_key)
+        if fact is None:
+            fact = XbrlFact(
+                source_key=source_key,
+                company_id=company_id,
+                filing_id=filing_id,
+                cik=cik,
+                accession_number=accession_number,
+                concept=concept,
+                label=label,
+                unit=unit,
+                value=value,
+                fiscal_period=fiscal_period,
+                fiscal_year=fiscal_year,
+                fiscal_quarter=fiscal_quarter,
+                form_type=form_type,
+                filed_date=filed_date,
+                frame=frame,
+            )
+            return self.add(fact)
+
+        fact.company_id = company_id
+        fact.filing_id = filing_id
+        fact.cik = cik
+        fact.accession_number = accession_number
+        fact.concept = concept
+        fact.label = label
+        fact.unit = unit
+        fact.value = value
+        fact.fiscal_period = fiscal_period
+        fact.fiscal_year = fiscal_year
+        fact.fiscal_quarter = fiscal_quarter
+        fact.form_type = form_type
+        fact.filed_date = filed_date
+        fact.frame = frame
+        self.session.flush()
+        return fact
+
     def find_by_concept(
         self,
         company_id: int,
@@ -162,4 +295,3 @@ class EvalRunRepository:
             .where(EvalRun.system_variant == system_variant)
             .order_by(EvalRun.started_at.desc())
         ).scalars().all()
-

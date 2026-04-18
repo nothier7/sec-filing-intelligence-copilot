@@ -138,6 +138,7 @@ class XbrlFact(TimestampMixin, Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_key: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), nullable=False)
     filing_id: Mapped[Optional[int]] = mapped_column(ForeignKey("filings.id"))
     cik: Mapped[str] = mapped_column(String(10), index=True, nullable=False)
@@ -182,4 +183,3 @@ class EvalRun(TimestampMixin, Base):
     retriever_config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     metrics: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     output_path: Mapped[Optional[str]] = mapped_column(Text)
-
