@@ -4,7 +4,9 @@ A deployable RAG system for asking cited questions over public SEC filings. The 
 
 ## Current Status
 
-Milestone 1 is in progress: repository foundation, backend scaffold, frontend scaffold, and local service setup.
+Milestones 1-5 are implemented locally: app scaffolding, persistence, SEC ingestion,
+filing parsing, chunking, and LlamaIndex retrieval plumbing. Cited answer generation,
+numeric grounding, evaluation, and the polished web demo are still planned work.
 
 ## Project Shape
 
@@ -80,10 +82,34 @@ For the current local workflow, SQLite is enough:
 mkdir -p data
 DATABASE_URL=sqlite:///data/sec_copilot.db make db-upgrade
 DATABASE_URL=sqlite:///data/sec_copilot.db .venv/bin/sec-copilot ingest-sec-company 320193 --limit 1
-DATABASE_URL=sqlite:///data/sec_copilot.db .venv/bin/sec-copilot parse-sec-filing 0000320193-24-000123
+DATABASE_URL=sqlite:///data/sec_copilot.db .venv/bin/sec-copilot parse-sec-filing <ACCESSION_NUMBER>
 ```
 
-Parsing converts a cached filing document into normalized filing sections and deterministic chunks. Later milestones index those chunks in Qdrant and use them for retrieval.
+Use an `accession_number` value from the ingestion command output. Parsing converts
+a cached filing document into normalized filing sections and deterministic chunks.
+
+### Retrieval
+
+Milestone 5 adds LlamaIndex node construction and local retrieval over parsed chunks:
+
+```bash
+DATABASE_URL=sqlite:///data/sec_copilot.db .venv/bin/sec-copilot retrieve-sec-filing \
+  <ACCESSION_NUMBER> "supply chain regulatory risks" --section-type risk_factors
+```
+
+For Qdrant-backed indexing, use either a running Qdrant URL or local Qdrant storage path:
+
+```bash
+DATABASE_URL=sqlite:///data/sec_copilot.db .venv/bin/sec-copilot index-sec-filing \
+  <ACCESSION_NUMBER> --qdrant-path data/qdrant-local --collection sec_filings
+```
+
+The project currently uses deterministic local dense and sparse hash embeddings for
+tests and offline smoke workflows. Production retrieval can swap in stronger
+embedding and sparse retrieval models without changing the stored chunk schema.
+Pass `--hybrid` to enable Qdrant hybrid indexing with the built-in sparse hashing
+path, or `--fastembed-sparse-model` if you have FastEmbed installed and want to
+use a named sparse model.
 
 ### Frontend
 

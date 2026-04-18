@@ -3,7 +3,9 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import asdict
+from pathlib import Path
 
+from sec_copilot.config import get_settings
 from sec_copilot.db.session import session_scope
 from sec_copilot.filings import FilingParseService
 from sec_copilot.ingestion import SecIngestionService
@@ -11,6 +13,7 @@ from sec_copilot.sec import SecClient
 
 
 def build_parser() -> argparse.ArgumentParser:
+    settings = get_settings()
     parser = argparse.ArgumentParser(prog="sec-copilot")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -41,6 +44,33 @@ def build_parser() -> argparse.ArgumentParser:
     parse.add_argument("accession_number", help="SEC accession number with dashes")
     parse.add_argument("--max-tokens", type=int, default=800, help="Maximum tokens per chunk")
     parse.add_argument("--overlap-tokens", type=int, default=100, help="Overlapping tokens per chunk")
+
+    retrieve = subparsers.add_parser(
+        "retrieve-sec-filing",
+        help="Run local retrieval over parsed chunks for one SEC filing",
+    )
+    retrieve.add_argument("accession_number", help="SEC accession number with dashes")
+    retrieve.add_argument("query", help="Retrieval query")
+    retrieve.add_argument("--top-k", type=int, default=5, help="Number of chunks to retrieve")
+    retrieve.add_argument("--section-type", help="Optional normalized section type filter")
+
+    index = subparsers.add_parser(
+        "index-sec-filing",
+        help="Index one parsed SEC filing into Qdrant",
+    )
+    index.add_argument("accession_number", help="SEC accession number with dashes")
+    index.add_argument(
+        "--collection",
+        default=settings.qdrant_collection,
+        help="Qdrant collection name",
+    )
+    index.add_argument("--qdrant-url", default=settings.qdrant_url, help="Remote Qdrant URL")
+    index.add_argument("--qdrant-path", help="Local Qdrant storage path")
+    index.add_argument("--hybrid", action="store_true", help="Enable Qdrant hybrid search")
+    index.add_argument(
+        "--fastembed-sparse-model",
+        help="Optional FastEmbed sparse model name for hybrid search",
+    )
     return parser
 
 
@@ -70,6 +100,59 @@ def main() -> None:
                 overlap_tokens=args.overlap_tokens,
             ).parse_by_accession_number(args.accession_number)
         print(json.dumps(asdict(result), indent=2, sort_keys=True))
+    elif args.command == "retrieve-sec-filing":
+        from sec_copilot.retrieval import RetrievalFilters, RetrievalIndexService
+
+        with session_scope() as session:
+            service = RetrievalIndexService(session=session)
+            filing = service.filings.get_by_accession_number(args.accession_number)
+            if filing is None:
+                raise ValueError(f"Filing not found: {args.accession_number}")
+            filters = RetrievalFilters(
+                accession_number=args.accession_number,
+                section_type=args.section_type,
+            )
+            results = service.retrieve_for_filing(
+                filing_id=filing.id,
+                query=args.query,
+                top_k=args.top_k,
+                filters=filters,
+            )
+        print(json.dumps([asdict(result) for result in results], indent=2, sort_keys=True))
+    elif args.command == "index-sec-filing":
+        from sec_copilot.retrieval import RetrievalIndexService
+        from sec_copilot.retrieval.qdrant import QdrantIndexConfig
+
+        qdrant_path = Path(args.qdrant_path) if args.qdrant_path else None
+        qdrant_url = None if qdrant_path else args.qdrant_url
+        with session_scope() as session:
+            service = RetrievalIndexService(session=session)
+            filing = service.filings.get_by_accession_number(args.accession_number)
+            if filing is None:
+                raise ValueError(f"Filing not found: {args.accession_number}")
+            service.build_qdrant_index_for_filing(
+                filing_id=filing.id,
+                config=QdrantIndexConfig(
+                    collection_name=args.collection,
+                    url=qdrant_url,
+                    path=qdrant_path,
+                    enable_hybrid=args.hybrid,
+                    fastembed_sparse_model=args.fastembed_sparse_model if args.hybrid else None,
+                ),
+            )
+        print(
+            json.dumps(
+                {
+                    "accession_number": args.accession_number,
+                    "collection": args.collection,
+                    "indexed": True,
+                    "qdrant_path": qdrant_path.as_posix() if qdrant_path else None,
+                    "qdrant_url": qdrant_url,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
 
 
 if __name__ == "__main__":
