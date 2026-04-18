@@ -4,10 +4,10 @@ A deployable RAG system for asking cited questions over public SEC filings. The 
 
 ## Current Status
 
-Milestones 1-8 are implemented locally: app scaffolding, persistence, SEC ingestion,
+Milestones 1-9 are implemented locally: app scaffolding, persistence, SEC ingestion,
 filing parsing, chunking, LlamaIndex retrieval plumbing, cited answer generation,
-XBRL numeric grounding, and filing change detection. Evaluation and the polished
-web demo are still planned work.
+XBRL numeric grounding, filing change detection, and a deterministic evaluation
+harness. The polished web demo is still planned work.
 
 ## Project Shape
 
@@ -16,7 +16,7 @@ web demo are still planned work.
 - Metadata store: Postgres
 - Vector store: Qdrant
 - Retrieval orchestration: LlamaIndex
-- Evaluation: FinanceBench-compatible benchmark flow plus a custom SEC filing eval set
+- Evaluation: deterministic local benchmark harness with FinanceBench-compatible extension points
 
 ## Why This Is Useful
 
@@ -171,6 +171,30 @@ The response includes added claims, removed claims, an unchanged claim count, an
 citations from both the current and prior filings when comparable evidence exists.
 If a prior filing or comparable section is missing, the response is marked
 unsupported with an explicit reason.
+
+### Evaluation
+
+Run the local benchmark from one command:
+
+```bash
+DATABASE_URL=sqlite:///data/sec_copilot.db .venv/bin/sec-copilot run-eval
+```
+
+The runner compares closed-book, naive RAG, metadata-aware RAG, and metadata-aware
+RAG plus XBRL grounding. It writes JSON metrics and a Markdown report under
+`evals/results/`, including an ablation table, retrieval/evidence recall,
+numeric accuracy, refusal accuracy, latency, and failure examples.
+
+The checked-in seed set is intentionally small and fixture-aligned so the harness
+can be tested offline. For live portfolio demos, create or extend JSONL benchmark
+rows that point at filings you ingested locally, then run:
+
+```bash
+DATABASE_URL=sqlite:///data/sec_copilot.db .venv/bin/sec-copilot run-eval \
+  --dataset evals/questions/sec_seed.jsonl
+```
+
+See [evals/README.md](evals/README.md) for the benchmark schema and variant definitions.
 
 ### Frontend
 
