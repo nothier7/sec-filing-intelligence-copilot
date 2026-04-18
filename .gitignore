@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Node
+node_modules/
+.next/
+out/
+tsconfig.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-lock.yaml
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local data and generated artifacts
+data/raw/
+data/cache/
+data/indexes/
+data/postgres/
+data/qdrant/
+*.sqlite
+*.sqlite3
+*.db
+evals/results/
+
+# OS and editor noise
+.DS_Store
+.idea/
+.vscode/
