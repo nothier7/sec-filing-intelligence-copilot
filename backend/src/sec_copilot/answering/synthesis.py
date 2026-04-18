@@ -83,6 +83,19 @@ def synthesize_extractive_answer(question: str, snippets: list[str]) -> str:
     return f"The filing evidence points to these disclosures: {joined}"
 
 
+def synthesize_numeric_fact_answer(
+    metric_label: str,
+    value: str,
+    unit: str,
+    period: str,
+    concept: str,
+) -> str:
+    return (
+        f"The structured SEC fact for {metric_label} is {value} {unit} for {period} "
+        f"(XBRL concept: {concept})."
+    )
+
+
 def insufficient_evidence_answer() -> str:
     return "I do not have enough filing evidence to answer that confidently."
 

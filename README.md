@@ -4,9 +4,10 @@ A deployable RAG system for asking cited questions over public SEC filings. The 
 
 ## Current Status
 
-Milestones 1-6 are implemented locally: app scaffolding, persistence, SEC ingestion,
-filing parsing, chunking, LlamaIndex retrieval plumbing, and cited answer generation.
-Numeric grounding, evaluation, and the polished web demo are still planned work.
+Milestones 1-7 are implemented locally: app scaffolding, persistence, SEC ingestion,
+filing parsing, chunking, LlamaIndex retrieval plumbing, cited answer generation,
+and XBRL numeric grounding. Evaluation and the polished web demo are still planned
+work.
 
 ## Project Shape
 
@@ -134,10 +135,17 @@ curl -X POST http://127.0.0.1:8000/ask \
 ```
 
 The current answer generator is deterministic and extractive: it only answers
-from retrieved chunks, returns citation snippets, and uses insufficient-evidence
-responses for unsupported, weakly supported, or numeric questions without numeric
-evidence. A later milestone can replace the synthesizer with an LLM while keeping
-the same response contract.
+from retrieved chunks, returns citation snippets, and uses structured XBRL facts
+when numeric grounding is available. It uses insufficient-evidence responses for
+unsupported prompts, weak retrieval, missing structured numeric facts, and
+mismatches between retrieved numeric text and structured facts. A later milestone
+can replace the synthesizer with an LLM while keeping the same response contract.
+
+Numeric answers include a `numeric_grounding` array with validation status:
+
+- `validated`: a matching XBRL fact was found and used in the answer.
+- `unavailable`: the system recognized the metric but could not find a structured fact.
+- `mismatched`: retrieved numeric text conflicts with the structured fact.
 
 ### Frontend
 
