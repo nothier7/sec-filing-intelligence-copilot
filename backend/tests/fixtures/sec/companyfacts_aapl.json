@@ -1,0 +1,50 @@
+{
+  "cik": 320193,
+  "entityName": "Apple Inc.",
+  "facts": {
+    "us-gaap": {
+      "Revenues": {
+        "label": "Revenue",
+        "units": {
+          "USD": [
+            {
+              "val": 391035000000,
+              "fy": 2024,
+              "fp": "FY",
+              "form": "10-K",
+              "filed": "2024-11-01",
+              "accn": "0000320193-24-000123",
+              "frame": "CY2024"
+            },
+            {
+              "val": 85777000000,
+              "fy": 2024,
+              "fp": "Q3",
+              "form": "10-Q",
+              "filed": "2024-08-02",
+              "accn": "0000320193-24-000083",
+              "frame": "CY2024Q2"
+            }
+          ]
+        }
+      },
+      "NetIncomeLoss": {
+        "label": "Net income",
+        "units": {
+          "USD": [
+            {
+              "val": 93736000000,
+              "fy": 2024,
+              "fp": "FY",
+              "form": "10-K",
+              "filed": "2024-11-01",
+              "accn": "0000320193-24-000123",
+              "frame": "CY2024"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+
