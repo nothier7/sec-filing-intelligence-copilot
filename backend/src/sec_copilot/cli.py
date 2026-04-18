@@ -54,6 +54,15 @@ def build_parser() -> argparse.ArgumentParser:
     retrieve.add_argument("--top-k", type=int, default=5, help="Number of chunks to retrieve")
     retrieve.add_argument("--section-type", help="Optional normalized section type filter")
 
+    ask = subparsers.add_parser(
+        "ask-sec-filing",
+        help="Answer one question over a parsed SEC filing with citations",
+    )
+    ask.add_argument("accession_number", help="SEC accession number with dashes")
+    ask.add_argument("question", help="Question to answer")
+    ask.add_argument("--top-k", type=int, default=5, help="Number of chunks to retrieve")
+    ask.add_argument("--section-type", help="Optional normalized section type filter")
+
     index = subparsers.add_parser(
         "index-sec-filing",
         help="Index one parsed SEC filing into Qdrant",
@@ -119,6 +128,19 @@ def main() -> None:
                 filters=filters,
             )
         print(json.dumps([asdict(result) for result in results], indent=2, sort_keys=True))
+    elif args.command == "ask-sec-filing":
+        from sec_copilot.answering import AskRequest, CitedAnswerService
+
+        with session_scope() as session:
+            response = CitedAnswerService(session=session).answer(
+                AskRequest(
+                    accession_number=args.accession_number,
+                    question=args.question,
+                    top_k=args.top_k,
+                    section_type=args.section_type,
+                )
+            )
+        print(response.model_dump_json(indent=2))
     elif args.command == "index-sec-filing":
         from sec_copilot.retrieval import RetrievalIndexService
         from sec_copilot.retrieval.qdrant import QdrantIndexConfig

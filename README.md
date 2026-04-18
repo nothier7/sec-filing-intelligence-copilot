@@ -4,9 +4,9 @@ A deployable RAG system for asking cited questions over public SEC filings. The 
 
 ## Current Status
 
-Milestones 1-5 are implemented locally: app scaffolding, persistence, SEC ingestion,
-filing parsing, chunking, and LlamaIndex retrieval plumbing. Cited answer generation,
-numeric grounding, evaluation, and the polished web demo are still planned work.
+Milestones 1-6 are implemented locally: app scaffolding, persistence, SEC ingestion,
+filing parsing, chunking, LlamaIndex retrieval plumbing, and cited answer generation.
+Numeric grounding, evaluation, and the polished web demo are still planned work.
 
 ## Project Shape
 
@@ -110,6 +110,34 @@ embedding and sparse retrieval models without changing the stored chunk schema.
 Pass `--hybrid` to enable Qdrant hybrid indexing with the built-in sparse hashing
 path, or `--fastembed-sparse-model` if you have FastEmbed installed and want to
 use a named sparse model.
+
+### Cited Answers
+
+After a filing is parsed, ask an evidence-constrained question from the CLI:
+
+```bash
+DATABASE_URL=sqlite:///data/sec_copilot.db .venv/bin/sec-copilot ask-sec-filing \
+  <ACCESSION_NUMBER> "What supply chain regulatory risks are described?" \
+  --section-type risk_factors
+```
+
+Or call the API:
+
+```bash
+curl -X POST http://127.0.0.1:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{
+    "accession_number": "<ACCESSION_NUMBER>",
+    "question": "What supply chain regulatory risks are described?",
+    "section_type": "risk_factors"
+  }'
+```
+
+The current answer generator is deterministic and extractive: it only answers
+from retrieved chunks, returns citation snippets, and uses insufficient-evidence
+responses for unsupported, weakly supported, or numeric questions without numeric
+evidence. A later milestone can replace the synthesizer with an LLM while keeping
+the same response contract.
 
 ### Frontend
 

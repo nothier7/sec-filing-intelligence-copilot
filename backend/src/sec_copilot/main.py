@@ -1,7 +1,12 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from collections.abc import Generator
 
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+
+from sec_copilot.answering import AskRequest, AskResponse, CitedAnswerService
 from sec_copilot.config import get_settings
+from sec_copilot.db.session import SessionLocal
 
 settings = get_settings()
 
@@ -31,3 +36,18 @@ def health() -> dict[str, str]:
         "environment": settings.app_env,
     }
 
+
+def get_db_session() -> Generator[Session, None, None]:
+    with SessionLocal() as session:
+        yield session
+
+
+@app.post("/ask", response_model=AskResponse, tags=["qa"])
+def ask(request: AskRequest, session: Session = Depends(get_db_session)) -> AskResponse:
+    try:
+        return CitedAnswerService(session=session).answer(request)
+    except ValueError as exc:
+        detail = str(exc)
+        if detail.startswith("Filing not found"):
+            raise HTTPException(status_code=404, detail=detail) from exc
+        raise HTTPException(status_code=422, detail=detail) from exc
