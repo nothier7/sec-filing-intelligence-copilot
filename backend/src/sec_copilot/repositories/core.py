@@ -5,7 +5,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, delete, select
 from sqlalchemy.orm import Session
 
 from sec_copilot.db.models import (
@@ -119,10 +119,27 @@ class FilingRepository:
         self.session.flush()
         return filing
 
-    def add_section(self, section: FilingSection) -> FilingSection:
+    def add_section(
+        self,
+        filing_id: int,
+        section_name: str,
+        normalized_section_type: str,
+        sequence: int,
+        text_hash: str,
+    ) -> FilingSection:
+        section = FilingSection(
+            filing_id=filing_id,
+            section_name=section_name,
+            normalized_section_type=normalized_section_type,
+            sequence=sequence,
+            text_hash=text_hash,
+        )
         self.session.add(section)
         self.session.flush()
         return section
+
+    def get(self, filing_id: int) -> Optional[Filing]:
+        return self.session.get(Filing, filing_id)
 
     def get_by_accession_number(self, accession_number: str) -> Optional[Filing]:
         return self.session.execute(
@@ -147,6 +164,13 @@ class FilingRepository:
             .order_by(FilingSection.sequence)
         ).scalars().all()
 
+    def delete_sections_for_filing(self, filing_id: int) -> int:
+        result = self.session.execute(
+            delete(FilingSection).where(FilingSection.filing_id == filing_id)
+        )
+        self.session.flush()
+        return result.rowcount or 0
+
 
 class ChunkRepository:
     def __init__(self, session: Session) -> None:
@@ -169,6 +193,11 @@ class ChunkRepository:
         return self.session.execute(
             select(Chunk).where(Chunk.section_id == section_id).order_by(Chunk.id)
         ).scalars().all()
+
+    def delete_for_filing(self, filing_id: int) -> int:
+        result = self.session.execute(delete(Chunk).where(Chunk.filing_id == filing_id))
+        self.session.flush()
+        return result.rowcount or 0
 
 
 class XbrlFactRepository:

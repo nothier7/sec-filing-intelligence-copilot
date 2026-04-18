@@ -74,6 +74,17 @@ After running migrations against a configured database, ingest one company by CI
 
 The command fetches SEC submissions, selected 10-K/10-Q filing documents, and company facts. Raw SEC artifacts are cached under `SEC_RAW_DATA_DIR`, which defaults to `data/raw/sec` and is intentionally ignored by git.
 
+For the current local workflow, SQLite is enough:
+
+```bash
+mkdir -p data
+DATABASE_URL=sqlite:///data/sec_copilot.db make db-upgrade
+DATABASE_URL=sqlite:///data/sec_copilot.db .venv/bin/sec-copilot ingest-sec-company 320193 --limit 1
+DATABASE_URL=sqlite:///data/sec_copilot.db .venv/bin/sec-copilot parse-sec-filing 0000320193-24-000123
+```
+
+Parsing converts a cached filing document into normalized filing sections and deterministic chunks. Later milestones index those chunks in Qdrant and use them for retrieval.
+
 ### Frontend
 
 ```bash

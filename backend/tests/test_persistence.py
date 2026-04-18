@@ -10,7 +10,6 @@ from sec_copilot.db.models import (
     Company,
     EvalRun,
     Filing,
-    FilingSection,
     XbrlFact,
 )
 from sec_copilot.repositories import (
@@ -65,13 +64,11 @@ def test_company_filing_section_and_chunk_repositories(session: Session) -> None
         )
     )
     section = filings.add_section(
-        FilingSection(
-            filing_id=filing.id,
-            section_name="Item 1A. Risk Factors",
-            normalized_section_type="risk_factors",
-            sequence=1,
-            text_hash="risk-hash",
-        )
+        filing_id=filing.id,
+        section_name="Item 1A. Risk Factors",
+        normalized_section_type="risk_factors",
+        sequence=1,
+        text_hash="risk-hash",
     )
     chunk = chunks.add(
         Chunk(

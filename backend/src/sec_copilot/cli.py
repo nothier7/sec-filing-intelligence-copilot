@@ -5,6 +5,7 @@ import json
 from dataclasses import asdict
 
 from sec_copilot.db.session import session_scope
+from sec_copilot.filings import FilingParseService
 from sec_copilot.ingestion import SecIngestionService
 from sec_copilot.sec import SecClient
 
@@ -32,6 +33,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Ignore cached SEC JSON/documents and refetch from SEC",
     )
+
+    parse = subparsers.add_parser(
+        "parse-sec-filing",
+        help="Parse one cached SEC filing into sections and chunks",
+    )
+    parse.add_argument("accession_number", help="SEC accession number with dashes")
+    parse.add_argument("--max-tokens", type=int, default=800, help="Maximum tokens per chunk")
+    parse.add_argument("--overlap-tokens", type=int, default=100, help="Overlapping tokens per chunk")
     return parser
 
 
@@ -53,8 +62,15 @@ def main() -> None:
             print(json.dumps(asdict(result), indent=2, sort_keys=True))
         finally:
             client.close()
+    elif args.command == "parse-sec-filing":
+        with session_scope() as session:
+            result = FilingParseService(
+                session=session,
+                max_tokens=args.max_tokens,
+                overlap_tokens=args.overlap_tokens,
+            ).parse_by_accession_number(args.accession_number)
+        print(json.dumps(asdict(result), indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":
     main()
-

@@ -30,8 +30,8 @@ sec-copilot = "sec_copilot.cli:main"
 where = ["src"]
 
 [tool.pytest.ini_options]
-testpaths = ["backend/tests"]
-pythonpath = ["backend/src"]
+testpaths = ["tests"]
+pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 100
