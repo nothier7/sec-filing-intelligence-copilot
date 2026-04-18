@@ -146,6 +146,17 @@ class FilingRepository:
             select(Filing).where(Filing.accession_number == accession_number)
         ).scalar_one_or_none()
 
+    def get_previous_filing(self, filing: Filing) -> Optional[Filing]:
+        return self.session.execute(
+            select(Filing)
+            .where(
+                Filing.company_id == filing.company_id,
+                Filing.form_type == filing.form_type,
+                Filing.filing_date < filing.filing_date,
+            )
+            .order_by(Filing.filing_date.desc(), Filing.accession_number.desc())
+        ).scalar_one_or_none()
+
     def list_for_company(
         self,
         company_id: int,
@@ -163,6 +174,18 @@ class FilingRepository:
             .where(FilingSection.filing_id == filing_id)
             .order_by(FilingSection.sequence)
         ).scalars().all()
+
+    def get_section_by_type(
+        self,
+        filing_id: int,
+        section_type: str,
+    ) -> Optional[FilingSection]:
+        return self.session.execute(
+            select(FilingSection).where(
+                FilingSection.filing_id == filing_id,
+                FilingSection.normalized_section_type == section_type,
+            )
+        ).scalar_one_or_none()
 
     def delete_sections_for_filing(self, filing_id: int) -> int:
         result = self.session.execute(
