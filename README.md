@@ -4,10 +4,10 @@ A deployable RAG system for asking cited questions over public SEC filings. The 
 
 ## Current Status
 
-Milestones 1-7 are implemented locally: app scaffolding, persistence, SEC ingestion,
+Milestones 1-8 are implemented locally: app scaffolding, persistence, SEC ingestion,
 filing parsing, chunking, LlamaIndex retrieval plumbing, cited answer generation,
-and XBRL numeric grounding. Evaluation and the polished web demo are still planned
-work.
+XBRL numeric grounding, and filing change detection. Evaluation and the polished
+web demo are still planned work.
 
 ## Project Shape
 
@@ -146,6 +146,31 @@ Numeric answers include a `numeric_grounding` array with validation status:
 - `validated`: a matching XBRL fact was found and used in the answer.
 - `unavailable`: the system recognized the metric but could not find a structured fact.
 - `mismatched`: retrieved numeric text conflicts with the structured fact.
+
+### Filing Change Detection
+
+Compare a section against the previous filing for the same company and form type:
+
+```bash
+DATABASE_URL=sqlite:///data/sec_copilot.db .venv/bin/sec-copilot compare-sec-filing \
+  <ACCESSION_NUMBER> --section-type risk_factors
+```
+
+Or call the API:
+
+```bash
+curl -X POST http://127.0.0.1:8000/compare \
+  -H "Content-Type: application/json" \
+  -d '{
+    "accession_number": "<ACCESSION_NUMBER>",
+    "section_type": "risk_factors"
+  }'
+```
+
+The response includes added claims, removed claims, an unchanged claim count, and
+citations from both the current and prior filings when comparable evidence exists.
+If a prior filing or comparable section is missing, the response is marked
+unsupported with an explicit reason.
 
 ### Frontend
 

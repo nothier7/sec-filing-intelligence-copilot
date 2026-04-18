@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from sec_copilot.answering import AskRequest, AskResponse, CitedAnswerService
+from sec_copilot.comparison import CompareRequest, CompareResponse, FilingComparisonService
 from sec_copilot.config import get_settings
 from sec_copilot.db.session import SessionLocal
 
@@ -46,6 +47,17 @@ def get_db_session() -> Generator[Session, None, None]:
 def ask(request: AskRequest, session: Session = Depends(get_db_session)) -> AskResponse:
     try:
         return CitedAnswerService(session=session).answer(request)
+    except ValueError as exc:
+        detail = str(exc)
+        if detail.startswith("Filing not found"):
+            raise HTTPException(status_code=404, detail=detail) from exc
+        raise HTTPException(status_code=422, detail=detail) from exc
+
+
+@app.post("/compare", response_model=CompareResponse, tags=["qa"])
+def compare(request: CompareRequest, session: Session = Depends(get_db_session)) -> CompareResponse:
+    try:
+        return FilingComparisonService(session=session).compare(request)
     except ValueError as exc:
         detail = str(exc)
         if detail.startswith("Filing not found"):

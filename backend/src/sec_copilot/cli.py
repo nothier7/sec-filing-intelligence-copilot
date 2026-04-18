@@ -63,6 +63,19 @@ def build_parser() -> argparse.ArgumentParser:
     ask.add_argument("--top-k", type=int, default=5, help="Number of chunks to retrieve")
     ask.add_argument("--section-type", help="Optional normalized section type filter")
 
+    compare = subparsers.add_parser(
+        "compare-sec-filing",
+        help="Compare one filing section against a previous filing",
+    )
+    compare.add_argument("accession_number", help="Current SEC accession number with dashes")
+    compare.add_argument(
+        "--section-type",
+        default="risk_factors",
+        help="Normalized section type to compare",
+    )
+    compare.add_argument("--previous-accession-number", help="Optional prior filing accession")
+    compare.add_argument("--max-claims", type=int, default=5, help="Maximum added/removed claims")
+
     index = subparsers.add_parser(
         "index-sec-filing",
         help="Index one parsed SEC filing into Qdrant",
@@ -138,6 +151,19 @@ def main() -> None:
                     question=args.question,
                     top_k=args.top_k,
                     section_type=args.section_type,
+                )
+            )
+        print(response.model_dump_json(indent=2))
+    elif args.command == "compare-sec-filing":
+        from sec_copilot.comparison import CompareRequest, FilingComparisonService
+
+        with session_scope() as session:
+            response = FilingComparisonService(session=session).compare(
+                CompareRequest(
+                    accession_number=args.accession_number,
+                    section_type=args.section_type,
+                    previous_accession_number=args.previous_accession_number,
+                    max_claims=args.max_claims,
                 )
             )
         print(response.model_dump_json(indent=2))
