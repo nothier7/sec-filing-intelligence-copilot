@@ -288,6 +288,37 @@ class XbrlFactRepository:
         statement = statement.order_by(XbrlFact.filed_date.desc(), XbrlFact.id.desc())
         return self.session.execute(statement).scalars().all()
 
+    def find_by_concepts(
+        self,
+        company_id: int,
+        concepts: Sequence[str],
+        fiscal_year: Optional[int] = None,
+        fiscal_quarter: Optional[int] = None,
+        fiscal_period: Optional[str] = None,
+        form_type: Optional[str] = None,
+        accession_number: Optional[str] = None,
+    ) -> Sequence[XbrlFact]:
+        statement: Select[tuple[XbrlFact]] = select(XbrlFact).where(
+            XbrlFact.company_id == company_id,
+            XbrlFact.concept.in_(concepts),
+        )
+        if fiscal_year is not None:
+            statement = statement.where(XbrlFact.fiscal_year == fiscal_year)
+        if fiscal_quarter is not None:
+            statement = statement.where(XbrlFact.fiscal_quarter == fiscal_quarter)
+        if fiscal_period is not None:
+            statement = statement.where(XbrlFact.fiscal_period == fiscal_period)
+        if form_type is not None:
+            statement = statement.where(XbrlFact.form_type == form_type)
+        if accession_number is not None:
+            statement = statement.where(XbrlFact.accession_number == accession_number)
+        statement = statement.order_by(
+            XbrlFact.filed_date.desc(),
+            XbrlFact.fiscal_year.desc(),
+            XbrlFact.id.desc(),
+        )
+        return self.session.execute(statement).scalars().all()
+
 
 class BenchmarkQuestionRepository:
     def __init__(self, session: Session) -> None:
