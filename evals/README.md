@@ -20,6 +20,28 @@ fixture-aligned so tests can run offline. For a live benchmark, add JSONL rows w
 `accession_number`, expected citations, sections, and XBRL concepts match the filings
 you ingested locally.
 
+## Real Apple Benchmark
+
+`evals/questions/aapl_real_2025_2026.jsonl` is a portfolio benchmark for locally
+ingested Apple filings:
+
+- FY2025 Form 10-K: `0000320193-25-000079`
+- Q1 FY2026 Form 10-Q: `0000320193-26-000006`
+
+Run it against a local database containing those filings:
+
+```bash
+PYTHONPATH=backend/src DATABASE_URL=sqlite:///data/sec_copilot_real.db \
+  .venv/bin/python -m sec_copilot.cli run-eval \
+  --dataset evals/questions/aapl_real_2025_2026.jsonl \
+  --output evals/results/aapl_real_eval.json \
+  --report evals/results/aapl_real_eval.md
+```
+
+The current tracked benchmark report is `reports/aapl_real_eval.md`. In the latest
+local run, `improved_rag_xbrl` reached 100% accuracy, 100% numeric accuracy, 100%
+refusal accuracy, and 100% evidence recall across 24 real SEC questions.
+
 ## JSONL Schema
 
 Each line is one benchmark question:

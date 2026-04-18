@@ -22,6 +22,9 @@ def test_classify_query_types() -> None:
     assert classify_query("What were operating expenses?") == QueryType.NUMERIC
     assert classify_query("What changed compared with the prior filing?") == QueryType.COMPARISON
     assert classify_query("Should I buy this stock?") == QueryType.UNSUPPORTED
+    assert classify_query("What legal proceedings did Apple disclose in Q1 2026?") == QueryType.TEXT
+    assert classify_query("Were disclosure controls effective in 2026?") == QueryType.TEXT
+    assert classify_query("How many shares were repurchased?") == QueryType.NUMERIC
 
 
 def test_cited_answer_service_returns_supported_answer_with_citations(session: Session) -> None:
@@ -250,6 +253,75 @@ def test_cited_answer_service_filters_numeric_citations_to_validated_fact(
     )
 
     assert [citation.chunk_id for citation in citations] == ["mda-expense"]
+
+
+def test_cited_answer_service_allows_no_material_change_comparison_with_one_chunk(
+    session: Session,
+) -> None:
+    company = CompanyRepository(session).add(
+        Company(cik="0000320193", ticker="AAPL", name="Apple Inc.")
+    )
+    filing = FilingRepository(session).add(
+        Filing(
+            company_id=company.id,
+            accession_number="0000320193-26-000006",
+            cik=company.cik,
+            form_type="10-Q",
+            filing_date=date(2026, 1, 30),
+            report_date=date(2025, 12, 27),
+            fiscal_year=2026,
+            fiscal_quarter=1,
+            source_url="https://www.sec.gov/Archives/example-q1.htm",
+        )
+    )
+    section = FilingRepository(session).add_section(
+        filing_id=filing.id,
+        section_name="Item 1A. Risk Factors",
+        normalized_section_type="risk_factors",
+        sequence=1,
+        text_hash="risk-hash",
+    )
+    session.add(
+        Chunk(
+            id="0000320193-26-000006:s0001:c0001",
+            filing_id=filing.id,
+            section_id=section.id,
+            text=(
+                "There have been no material changes to the Company's risk factors "
+                "since the 2025 Form 10-K."
+            ),
+            token_count=16,
+            metadata_json={
+                "accession_number": filing.accession_number,
+                "cik": filing.cik,
+                "fiscal_year": 2026,
+                "fiscal_quarter": 1,
+                "form_type": "10-Q",
+                "section_name": "Item 1A. Risk Factors",
+                "section_type": "risk_factors",
+                "source_url": filing.source_url,
+            },
+            source_start=0,
+            source_end=91,
+        )
+    )
+    session.commit()
+
+    response = CitedAnswerService(
+        session=session,
+        embed_model=HashEmbedding(dimensions=32),
+    ).answer(
+        AskRequest(
+            accession_number="0000320193-26-000006",
+            question="What changed compared with the prior risk factors?",
+            section_type="risk_factors",
+            top_k=1,
+        )
+    )
+
+    assert response.supported is True
+    assert response.insufficient_evidence_reason is None
+    assert "no material changes" in response.answer
 
 
 def test_cited_answer_service_flags_numeric_fact_mismatch(session: Session) -> None:

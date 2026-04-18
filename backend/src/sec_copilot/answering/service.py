@@ -16,6 +16,7 @@ from sec_copilot.answering.models import (
 )
 from sec_copilot.answering.synthesis import (
     best_evidence_snippet,
+    has_no_material_change_evidence,
     has_numeric_evidence,
     insufficient_evidence_answer,
     metric_clarification_answer,
@@ -178,7 +179,11 @@ class CitedAnswerService:
                 return numeric_grounding[0].reason or "structured_fact_unavailable"
             if status == NumericGroundingStatus.MISMATCHED:
                 return "numeric_fact_mismatch"
-        if query_type == QueryType.COMPARISON and len(results) < 2:
+        if (
+            query_type == QueryType.COMPARISON
+            and len(results) < 2
+            and not has_no_material_change_evidence(snippets)
+        ):
             return "not_enough_comparison_evidence"
         return None
 

@@ -71,7 +71,7 @@ def classify_query(question: str) -> QueryType:
         return QueryType.UNSUPPORTED
     if tokens & COMPARISON_TERMS:
         return QueryType.COMPARISON
-    if tokens & NUMERIC_TERMS or re.search(r"[$%]|\b\d+(\.\d+)?\b", normalized):
+    if tokens & NUMERIC_TERMS or _contains_quantity_marker(normalized):
         return QueryType.NUMERIC
     return QueryType.TEXT
 
@@ -82,3 +82,25 @@ def _normalize(text: str) -> str:
 
 def _contains_any_phrase(text: str, phrases: set[str]) -> bool:
     return any(phrase in text for phrase in phrases)
+
+
+def _contains_quantity_marker(text: str) -> bool:
+    if "$" in text or "%" in text:
+        return True
+
+    for match in re.finditer(r"\b\d+(\.\d+)?\b", text):
+        token = match.group(0)
+        if _looks_like_period_marker(text, match.start(), token):
+            continue
+        return True
+    return False
+
+
+def _looks_like_period_marker(text: str, start: int, token: str) -> bool:
+    if len(token) == 4 and token.startswith(("19", "20")):
+        return True
+
+    prefix = text[max(0, start - 2) : start].strip()
+    if token in {"1", "2", "3", "4"} and prefix == "q":
+        return True
+    return False

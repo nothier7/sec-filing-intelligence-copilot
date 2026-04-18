@@ -4,10 +4,10 @@ A deployable RAG system for asking cited questions over public SEC filings. The 
 
 ## Current Status
 
-Milestones 1-9 are implemented locally: app scaffolding, persistence, SEC ingestion,
-filing parsing, chunking, LlamaIndex retrieval plumbing, cited answer generation,
-XBRL numeric grounding, filing change detection, and a deterministic evaluation
-harness. The polished web demo is still planned work.
+The local portfolio demo is implemented end to end: app scaffolding, persistence,
+SEC ingestion, filing parsing, chunking, LlamaIndex retrieval plumbing, cited
+answer generation, XBRL numeric grounding, filing change detection, deterministic
+evaluation, and a small local web UI.
 
 ## Project Shape
 
@@ -194,7 +194,11 @@ DATABASE_URL=sqlite:///data/sec_copilot.db .venv/bin/sec-copilot run-eval \
   --dataset evals/questions/sec_seed.jsonl
 ```
 
-See [evals/README.md](evals/README.md) for the benchmark schema and variant definitions.
+The real Apple benchmark at `evals/questions/aapl_real_2025_2026.jsonl` covers 24
+questions across the FY2025 10-K and Q1 FY2026 10-Q. In the latest local run,
+`improved_rag_xbrl` reached 100% accuracy, 100% numeric accuracy, 100% refusal
+accuracy, and 100% evidence recall. See [reports/aapl_real_eval.md](reports/aapl_real_eval.md)
+for the tracked report and [evals/README.md](evals/README.md) for the benchmark schema.
 
 ### Frontend
 

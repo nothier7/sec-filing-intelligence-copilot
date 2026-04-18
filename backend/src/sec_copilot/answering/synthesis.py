@@ -98,6 +98,10 @@ def has_numeric_evidence(snippets: list[str]) -> bool:
     return any(NUMBER_PATTERN.search(snippet) for snippet in snippets)
 
 
+def has_no_material_change_evidence(snippets: list[str]) -> bool:
+    return any("no material changes" in snippet.casefold() for snippet in snippets)
+
+
 def synthesize_extractive_answer(question: str, snippets: list[str]) -> str:
     if not snippets:
         return insufficient_evidence_answer()
