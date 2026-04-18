@@ -15,6 +15,7 @@ from sec_copilot.answering.models import (
 )
 from sec_copilot.answering.synthesis import (
     best_evidence_snippet,
+    has_numeric_evidence,
     insufficient_evidence_answer,
     synthesize_extractive_answer,
     synthesize_numeric_fact_answer,
@@ -32,10 +33,12 @@ class CitedAnswerService:
         session: Session,
         embed_model: Optional[HashEmbedding] = None,
         min_similarity_score: float = 0.05,
+        enable_numeric_grounding: bool = True,
     ) -> None:
         self.retrieval = RetrievalIndexService(session=session, embed_model=embed_model)
         self.fact_lookup = FactLookupService(session=session)
         self.min_similarity_score = min_similarity_score
+        self.enable_numeric_grounding = enable_numeric_grounding
 
     def answer(self, request: AskRequest) -> AskResponse:
         query_type = classify_query(request.question)
@@ -56,7 +59,7 @@ class CitedAnswerService:
             raise ValueError(f"Filing not found: {request.accession_number}")
 
         fact_lookup = None
-        if query_type == QueryType.NUMERIC:
+        if query_type == QueryType.NUMERIC and self.enable_numeric_grounding:
             fact_lookup = self.fact_lookup.lookup(
                 FactLookupRequest(
                     question=request.question,
@@ -88,6 +91,7 @@ class CitedAnswerService:
         insufficient_reason = self._insufficient_reason(
             query_type=query_type,
             results=strong_results,
+            snippets=snippets,
             numeric_grounding=numeric_grounding,
         )
         if insufficient_reason is not None:
@@ -148,11 +152,16 @@ class CitedAnswerService:
         self,
         query_type: QueryType,
         results: list[RetrievalResult],
+        snippets: list[str],
         numeric_grounding: list[NumericGrounding],
     ) -> Optional[str]:
         if not results:
             return "no_retrieved_evidence"
         if query_type == QueryType.NUMERIC:
+            if not self.enable_numeric_grounding:
+                if not has_numeric_evidence(snippets):
+                    return "no_numeric_evidence"
+                return None
             if not numeric_grounding:
                 return "no_metric_match"
             status = numeric_grounding[0].status

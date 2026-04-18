@@ -76,6 +76,36 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("--previous-accession-number", help="Optional prior filing accession")
     compare.add_argument("--max-claims", type=int, default=5, help="Maximum added/removed claims")
 
+    run_eval = subparsers.add_parser(
+        "run-eval",
+        help="Run the local SEC RAG benchmark and generate eval artifacts",
+    )
+    run_eval.add_argument(
+        "--dataset",
+        type=Path,
+        default=Path("evals/questions/sec_seed.jsonl"),
+        help="JSONL benchmark question file",
+    )
+    run_eval.add_argument(
+        "--variant",
+        dest="variants",
+        action="append",
+        choices=["closed_book", "naive_rag", "improved_rag", "improved_rag_xbrl"],
+        help="Variant to run. Repeat to run multiple variants. Defaults to all variants.",
+    )
+    run_eval.add_argument(
+        "--output",
+        type=Path,
+        default=Path("evals/results/sec_seed_eval.json"),
+        help="JSON result output path",
+    )
+    run_eval.add_argument(
+        "--report",
+        type=Path,
+        default=Path("evals/results/sec_seed_eval.md"),
+        help="Markdown report output path",
+    )
+
     index = subparsers.add_parser(
         "index-sec-filing",
         help="Index one parsed SEC filing into Qdrant",
@@ -167,6 +197,34 @@ def main() -> None:
                 )
             )
         print(response.model_dump_json(indent=2))
+    elif args.command == "run-eval":
+        from sec_copilot.evals import EvaluationRunner, format_eval_report, parse_variants
+
+        variants = parse_variants(args.variants)
+        with session_scope() as session:
+            result = EvaluationRunner(session=session).run(
+                dataset_path=args.dataset,
+                variants=variants,
+            )
+        report = format_eval_report(result)
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+        args.report.write_text(report, encoding="utf-8")
+        print(
+            json.dumps(
+                {
+                    "dataset": result.dataset_path,
+                    "question_count": result.question_count,
+                    "variants": [variant.value for variant in variants],
+                    "output": args.output.as_posix(),
+                    "report": args.report.as_posix(),
+                    "metrics": result.model_dump(mode="json")["metrics"],
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
     elif args.command == "index-sec-filing":
         from sec_copilot.retrieval import RetrievalIndexService
         from sec_copilot.retrieval.qdrant import QdrantIndexConfig
