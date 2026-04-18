@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -85,7 +86,10 @@ class CitedAnswerService:
             ),
         )
         strong_results = self._strong_results(results)
-        citations = [self._citation_for_result(request.question, result) for result in strong_results]
+        citation_query = self._citation_query(request.question, fact_lookup)
+        citations = [self._citation_for_result(citation_query, result) for result in strong_results]
+        if query_type == QueryType.NUMERIC and fact_lookup is not None and fact_lookup.fact is not None:
+            citations = self._prioritize_fact_citations(citations, fact_lookup.fact)
         snippets = [citation.snippet for citation in citations]
         numeric_grounding = self._numeric_grounding(fact_lookup, snippets)
 
@@ -192,6 +196,27 @@ class CitedAnswerService:
             snippet=best_evidence_snippet(question, result),
         )
 
+    def _citation_query(self, question: str, fact_lookup: Optional[FactLookupResult]) -> str:
+        if fact_lookup is None or fact_lookup.fact is None:
+            return question
+
+        fact = fact_lookup.fact
+        parts = [
+            question,
+            fact_lookup.metric.label if fact_lookup.metric else "",
+            " ".join(fact_lookup.metric.keywords) if fact_lookup.metric else "",
+            fact.label or "",
+            fact.concept,
+            format_fact_value(fact.value),
+        ]
+        return " ".join(part for part in parts if part)
+
+    def _prioritize_fact_citations(self, citations: list[Citation], fact: XbrlFact) -> list[Citation]:
+        supporting_citations = [
+            citation for citation in citations if _citation_supports_fact(citation, fact)
+        ]
+        return supporting_citations or citations
+
     def _numeric_grounding(
         self,
         fact_lookup: Optional[FactLookupResult],
@@ -240,8 +265,7 @@ class CitedAnswerService:
         observed_numbers = _large_numeric_tokens(snippets)
         if not observed_numbers:
             return False
-        fact_digits = "".join(character for character in format_fact_value(fact.value) if character.isdigit())
-        return fact_digits not in observed_numbers
+        return not observed_numbers.intersection(_expected_numeric_tokens(fact))
 
     def _period_label(self, fact: XbrlFact) -> str:
         if fact.fiscal_period:
@@ -264,3 +288,23 @@ def _large_numeric_tokens(snippets: list[str]) -> set[str]:
                 continue
             tokens.add(digits)
     return tokens
+
+
+def _expected_numeric_tokens(fact: XbrlFact) -> set[str]:
+    fact_digits = "".join(character for character in format_fact_value(fact.value) if character.isdigit())
+    tokens = {fact_digits} if fact_digits else set()
+
+    try:
+        value = Decimal(str(fact.value)).copy_abs()
+    except (InvalidOperation, ValueError):
+        return tokens
+
+    for divisor in (Decimal("1000"), Decimal("1000000"), Decimal("1000000000")):
+        scaled = value / divisor
+        if scaled == scaled.to_integral_value():
+            tokens.add(str(int(scaled)))
+    return tokens
+
+
+def _citation_supports_fact(citation: Citation, fact: XbrlFact) -> bool:
+    return bool(_large_numeric_tokens([citation.snippet]) & _expected_numeric_tokens(fact))

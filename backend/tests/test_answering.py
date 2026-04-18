@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from sec_copilot.answering import AskRequest, CitedAnswerService, QueryType, classify_query
+from sec_copilot.answering import AskRequest, Citation, CitedAnswerService, QueryType, classify_query
 from sec_copilot.db.models import Chunk, Company, Filing, XbrlFact
 from sec_copilot.filings import FilingParseService
 from sec_copilot.main import app, get_db_session
@@ -147,6 +147,109 @@ def test_cited_answer_service_uses_structured_spending_fact_for_specific_metric(
     assert "31,370,000,000 USD" in response.answer
     assert response.numeric_grounding[0].metric == "research_and_development"
     assert response.numeric_grounding[0].concept == "ResearchAndDevelopmentExpense"
+
+
+def test_cited_answer_service_accepts_filing_table_values_in_millions(
+    session: Session,
+) -> None:
+    company = CompanyRepository(session).add(
+        Company(cik="0000320193", ticker="AAPL", name="Apple Inc.")
+    )
+    filing = FilingRepository(session).add(
+        Filing(
+            company_id=company.id,
+            accession_number="0000320193-24-000123",
+            cik=company.cik,
+            form_type="10-K",
+            filing_date=date(2024, 11, 1),
+            report_date=date(2024, 9, 28),
+            fiscal_year=2024,
+            source_url="https://www.sec.gov/Archives/example.htm",
+        )
+    )
+    section = FilingRepository(session).add_section(
+        filing_id=filing.id,
+        section_name="Item 7. MD&A",
+        normalized_section_type="mda",
+        sequence=1,
+        text_hash="mda-hash",
+    )
+    session.add(
+        Chunk(
+            id="0000320193-24-000123:s0001:c0001",
+            filing_id=filing.id,
+            section_id=section.id,
+            text=(
+                "Net sales table (dollars in millions): "
+                "Total net sales $ 383,285 in 2024."
+            ),
+            token_count=12,
+            metadata_json={
+                "accession_number": filing.accession_number,
+                "cik": filing.cik,
+                "fiscal_year": 2024,
+                "form_type": "10-K",
+                "section_name": "Item 7. MD&A",
+                "section_type": "mda",
+                "source_url": filing.source_url,
+            },
+            source_start=0,
+            source_end=78,
+        )
+    )
+    session.commit()
+    _add_revenue_fact(session, filing.id)
+
+    response = CitedAnswerService(
+        session=session,
+        embed_model=HashEmbedding(dimensions=32),
+    ).answer(
+        AskRequest(
+            accession_number="0000320193-24-000123",
+            question="How much revenue did Apple report in 2024?",
+            top_k=1,
+        )
+    )
+
+    assert response.supported is True
+    assert response.numeric_grounding[0].status == "validated"
+    assert response.insufficient_evidence_reason is None
+
+
+def test_cited_answer_service_filters_numeric_citations_to_validated_fact(
+    session: Session,
+) -> None:
+    service = CitedAnswerService(session=session)
+    fact = XbrlFact(
+        source_key="source",
+        company_id=1,
+        filing_id=1,
+        cik="0000320193",
+        accession_number="0000320193-24-000123",
+        concept="ResearchAndDevelopmentExpense",
+        label="Research and Development Expense",
+        unit="USD",
+        value=Decimal("34550000000"),
+        fiscal_period="FY",
+        fiscal_year=2024,
+        form_type="10-K",
+    )
+
+    citations = service._prioritize_fact_citations(
+        [
+            Citation(
+                chunk_id="deferred-tax",
+                snippet="Capitalized research and development $ 15,041 $ 10,739",
+            ),
+            Citation(
+                chunk_id="mda-expense",
+                snippet="Research and development $ 34,550 10 % $ 31,370",
+            ),
+        ],
+        fact,
+    )
+
+    assert [citation.chunk_id for citation in citations] == ["mda-expense"]
 
 
 def test_cited_answer_service_flags_numeric_fact_mismatch(session: Session) -> None:
