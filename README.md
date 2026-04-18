@@ -54,6 +54,16 @@ Health check:
 curl http://127.0.0.1:8000/health
 ```
 
+### Database Migrations
+
+The backend uses SQLAlchemy models and Alembic migrations. With `DATABASE_URL` pointed at a running Postgres database:
+
+```bash
+make db-upgrade
+```
+
+Milestone 2 tests use SQLite in memory, so the persistence layer can be verified without Docker.
+
 ### Frontend
 
 ```bash

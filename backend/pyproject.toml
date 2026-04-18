@@ -8,9 +8,12 @@ version = "0.1.0"
 description = "FastAPI backend for the SEC Filing Intelligence Copilot."
 requires-python = ">=3.9"
 dependencies = [
+    "alembic>=1.14.0",
     "fastapi>=0.115.0",
+    "psycopg[binary]>=3.2.0",
     "uvicorn[standard]>=0.30.0",
     "pydantic-settings>=2.5.0",
+    "SQLAlchemy>=2.0.35",
 ]
 
 [project.optional-dependencies]
@@ -30,4 +33,3 @@ pythonpath = ["backend/src"]
 [tool.ruff]
 line-length = 100
 target-version = "py39"
-

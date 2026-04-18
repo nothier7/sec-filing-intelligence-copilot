@@ -1,4 +1,4 @@
-.PHONY: backend-install backend-dev backend-test frontend-install frontend-dev frontend-lint services-up services-down
+.PHONY: backend-install backend-dev backend-test db-upgrade db-downgrade frontend-install frontend-dev frontend-lint services-up services-down
 
 backend-install:
 	.venv/bin/python3 -m ensurepip --upgrade
@@ -9,6 +9,12 @@ backend-dev:
 
 backend-test:
 	.venv/bin/pytest backend/tests
+
+db-upgrade:
+	cd backend && ../.venv/bin/alembic upgrade head
+
+db-downgrade:
+	cd backend && ../.venv/bin/alembic downgrade -1
 
 frontend-install:
 	cd frontend && npm install
