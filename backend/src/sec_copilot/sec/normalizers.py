@@ -71,6 +71,7 @@ def normalize_recent_filings(
     archives_base_url: str = "https://www.sec.gov/Archives",
 ) -> list[NormalizedFiling]:
     cik = normalize_cik(submissions.get("cik", ""))
+    fiscal_year_end = _optional_string(submissions.get("fiscalYearEnd"))
     allowed_forms = set(form_types)
     recent = submissions.get("filings", {}).get("recent", {})
     rows = _transpose_recent_filings(recent)
@@ -88,6 +89,7 @@ def normalize_recent_filings(
             continue
 
         report_date = _parse_date(row.get("reportDate"))
+        fiscal_period = _optional_string(row.get("fp"))
         filings.append(
             NormalizedFiling(
                 accession_number=accession_number,
@@ -95,8 +97,18 @@ def normalize_recent_filings(
                 form_type=form_type,
                 filing_date=filing_date,
                 report_date=report_date,
-                fiscal_year=report_date.year if report_date else None,
-                fiscal_quarter=_infer_fiscal_quarter(form_type, report_date),
+                fiscal_year=_filing_fiscal_year(
+                    form_type=form_type,
+                    report_date=report_date,
+                    fiscal_year_end=fiscal_year_end,
+                    sec_fiscal_year=_optional_int(row.get("fy")),
+                ),
+                fiscal_quarter=_fiscal_quarter_from_period(fiscal_period)
+                or _infer_fiscal_quarter(
+                    form_type=form_type,
+                    report_date=report_date,
+                    fiscal_year_end=fiscal_year_end,
+                ),
                 primary_document=primary_document,
                 source_url=filing_document_url(
                     cik=cik,
@@ -245,12 +257,55 @@ def _first_non_empty(values: Sequence[Any]) -> Optional[str]:
     return None
 
 
-def _infer_fiscal_quarter(form_type: str, report_date: Optional[date]) -> Optional[int]:
+def _filing_fiscal_year(
+    form_type: str,
+    report_date: Optional[date],
+    fiscal_year_end: Optional[str],
+    sec_fiscal_year: Optional[int],
+) -> Optional[int]:
+    if sec_fiscal_year is not None:
+        return sec_fiscal_year
+    if report_date is None:
+        return None
+    if form_type == "10-K":
+        return report_date.year
+
+    fiscal_end_month_day = _fiscal_year_end_month_day(fiscal_year_end)
+    if fiscal_end_month_day is None:
+        return report_date.year
+
+    fiscal_end_month, fiscal_end_day = fiscal_end_month_day
+    if (report_date.month, report_date.day) > (fiscal_end_month, fiscal_end_day):
+        return report_date.year + 1
+    return report_date.year
+
+
+def _infer_fiscal_quarter(
+    form_type: str,
+    report_date: Optional[date],
+    fiscal_year_end: Optional[str] = None,
+) -> Optional[int]:
     if form_type == "10-K":
         return None
     if form_type != "10-Q" or report_date is None:
         return None
+    fiscal_end_month_day = _fiscal_year_end_month_day(fiscal_year_end)
+    if fiscal_end_month_day is not None:
+        fiscal_end_month, _ = fiscal_end_month_day
+        month_offset = (report_date.month - fiscal_end_month) % 12
+        if month_offset:
+            return min(((month_offset - 1) // 3) + 1, 3)
     return ((report_date.month - 1) // 3) + 1
+
+
+def _fiscal_year_end_month_day(value: Optional[str]) -> Optional[tuple[int, int]]:
+    if value is None or len(value) != 4 or not value.isdigit():
+        return None
+    month = int(value[:2])
+    day = int(value[2:])
+    if not 1 <= month <= 12 or not 1 <= day <= 31:
+        return None
+    return month, day
 
 
 def _fiscal_quarter_from_period(fiscal_period: Optional[str]) -> Optional[int]:
