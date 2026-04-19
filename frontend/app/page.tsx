@@ -28,6 +28,91 @@ const sampleQuestions = [
   "Should I buy this stock?"
 ];
 
+const benchmarkRows = [
+  {
+    variant: "Closed book",
+    role: "No filing context",
+    accuracy: 8.3,
+    numericAccuracy: 0,
+    groundedAccuracy: 0,
+    refusalAccuracy: 50,
+    evidenceRecall: 16.7,
+    latency: "0.0 ms"
+  },
+  {
+    variant: "Naive RAG",
+    role: "Unfiltered retrieval",
+    accuracy: 33.3,
+    numericAccuracy: 16.7,
+    groundedAccuracy: 0,
+    refusalAccuracy: 50,
+    evidenceRecall: 83.3,
+    latency: "65.6 ms"
+  },
+  {
+    variant: "Filtered RAG",
+    role: "Metadata-aware retrieval",
+    accuracy: 54.2,
+    numericAccuracy: 16.7,
+    groundedAccuracy: 0,
+    refusalAccuracy: 75,
+    evidenceRecall: 100,
+    latency: "38.4 ms"
+  },
+  {
+    variant: "GPT-5 mini closed book",
+    role: "Generic model baseline",
+    accuracy: 8.3,
+    numericAccuracy: 0,
+    groundedAccuracy: 0,
+    refusalAccuracy: 50,
+    evidenceRecall: 16.7,
+    latency: "1791.1 ms"
+  },
+  {
+    variant: "GPT-5 mini + retrieved context",
+    role: "External model with excerpts",
+    accuracy: 50,
+    numericAccuracy: 66.7,
+    groundedAccuracy: 0,
+    refusalAccuracy: 50,
+    evidenceRecall: 100,
+    latency: "1717.2 ms"
+  },
+  {
+    variant: "Filtered RAG + XBRL",
+    role: "Retrieval plus structured facts",
+    accuracy: 100,
+    numericAccuracy: 100,
+    groundedAccuracy: 100,
+    refusalAccuracy: 100,
+    evidenceRecall: 100,
+    latency: "40.2 ms"
+  }
+];
+
+const benchmarkFacts = [
+  { label: "Questions", value: "24" },
+  { label: "Filings", value: "2" },
+  { label: "Issuer", value: "AAPL" },
+  { label: "Model baseline", value: "gpt-5-mini" }
+];
+
+const benchmarkFailures = [
+  {
+    label: "Closed-book limit",
+    text: "GPT-5 mini refused the 2025 revenue question without filing evidence. The validated XBRL value is $416.161B."
+  },
+  {
+    label: "Context-only limit",
+    text: "GPT-5 mini with retrieved excerpts answered several numbers correctly, but still had 0% grounded numeric accuracy."
+  },
+  {
+    label: "Structured fix",
+    text: "The XBRL-grounded variant validates financial values against parsed SEC facts before returning the final answer."
+  }
+];
+
 type Citation = {
   chunk_id: string;
   accession_number?: string;
@@ -92,7 +177,7 @@ type CompareResponse = {
   insufficient_evidence_reason?: string;
 };
 
-type Mode = "ask" | "compare";
+type Mode = "ask" | "compare" | "benchmark";
 
 export default function Home() {
   const [mode, setMode] = useState<Mode>("ask");
@@ -210,6 +295,18 @@ export default function Home() {
               >
                 Compare
               </button>
+              <button
+                className={mode === "benchmark" ? "active" : ""}
+                type="button"
+                onClick={() => {
+                  setMode("benchmark");
+                  setAskResponse(null);
+                  setCompareResponse(null);
+                  setError(null);
+                }}
+              >
+                Benchmark
+              </button>
             </div>
 
             {mode === "ask" ? (
@@ -251,7 +348,7 @@ export default function Home() {
                   {isLoading ? "Running retrieval..." : "Ask with citations"}
                 </button>
               </form>
-            ) : (
+            ) : mode === "compare" ? (
               <form onSubmit={submitCompare}>
                 <label htmlFor="current-filing">Current filing</label>
                 <select
@@ -293,6 +390,8 @@ export default function Home() {
                   {isLoading ? "Comparing filings..." : "Compare section changes"}
                 </button>
               </form>
+            ) : (
+              <BenchmarkBrief />
             )}
 
             <div className="sample-block" aria-label="Sample questions">
@@ -302,6 +401,9 @@ export default function Home() {
                   type="button"
                   onClick={() => {
                     setMode("ask");
+                    setAskResponse(null);
+                    setCompareResponse(null);
+                    setError(null);
                     setQuestion(sampleQuestion);
                     setSectionType(sampleQuestion.includes("supply") ? "risk_factors" : "all");
                   }}
@@ -314,20 +416,58 @@ export default function Home() {
 
           <section className="answer-panel" aria-label="Research result">
             <div className="filing-strip">
-              <span>{selectedFiling?.formType}</span>
-              <strong>{selectedFiling?.period}</strong>
-              <span>{selectedFiling?.filedDate}</span>
-              <code>{accessionNumber}</code>
+              {mode === "benchmark" ? (
+                <>
+                  <span>Apple eval</span>
+                  <strong>24 real questions</strong>
+                  <span>2025 10-K + Q1 2026 10-Q</span>
+                  <code>gpt-5-mini baseline</code>
+                </>
+              ) : (
+                <>
+                  <span>{selectedFiling?.formType}</span>
+                  <strong>{selectedFiling?.period}</strong>
+                  <span>{selectedFiling?.filedDate}</span>
+                  <code>{accessionNumber}</code>
+                </>
+              )}
             </div>
 
-            {error ? <div className="error-box">{error}</div> : null}
-            {!askResponse && !compareResponse && !error ? <EmptyState /> : null}
-            {askResponse ? <AskResult response={askResponse} /> : null}
-            {compareResponse ? <CompareResult response={compareResponse} /> : null}
+            {mode === "benchmark" ? (
+              <BenchmarkResult />
+            ) : (
+              <>
+                {error ? <div className="error-box">{error}</div> : null}
+                {!askResponse && !compareResponse && !error ? <EmptyState /> : null}
+                {askResponse ? <AskResult response={askResponse} /> : null}
+                {compareResponse ? <CompareResult response={compareResponse} /> : null}
+              </>
+            )}
           </section>
         </div>
       </section>
     </main>
+  );
+}
+
+function BenchmarkBrief() {
+  return (
+    <section className="benchmark-brief" aria-label="Benchmark summary">
+      <p className="panel-kicker">Tracked benchmark</p>
+      <h2>Real filing questions, measured against generic model baselines.</h2>
+      <p>
+        The benchmark uses Apple’s FY2025 10-K and Q1 FY2026 10-Q to test numeric
+        accuracy, grounded numeric accuracy, refusal behavior, and citation recall.
+      </p>
+      <div className="brief-grid">
+        {benchmarkFacts.map((fact) => (
+          <Metric key={fact.label} label={fact.label} value={fact.value} />
+        ))}
+      </div>
+      <code className="benchmark-command">
+        .venv/bin/python -m sec_copilot.cli run-eval --variant improved_rag_xbrl
+      </code>
+    </section>
   );
 }
 
@@ -341,6 +481,76 @@ function EmptyState() {
         validated XBRL fact when the backend is using `data/sec_copilot_real.db`.
       </p>
     </div>
+  );
+}
+
+function BenchmarkResult() {
+  return (
+    <div className="result-stack benchmark-result">
+      <div className="answer-heading">
+        <p className="panel-kicker">Evaluation</p>
+        <span>Generated 2026-04-19</span>
+      </div>
+      <h2>Structured SEC facts beat context-only answers on grounded financial QA.</h2>
+
+      <div className="benchmark-scoreboard" aria-label="Benchmark headline metrics">
+        <Metric label="Best overall accuracy" value="100%" />
+        <Metric label="Best grounded numeric accuracy" value="100%" />
+        <Metric label="OpenAI context grounded accuracy" value="0%" />
+      </div>
+
+      <div className="benchmark-table-wrap">
+        <table className="benchmark-table">
+          <thead>
+            <tr>
+              <th scope="col">Variant</th>
+              <th scope="col">Accuracy</th>
+              <th scope="col">Numeric</th>
+              <th scope="col">Grounded numeric</th>
+              <th scope="col">Refusal</th>
+              <th scope="col">Evidence</th>
+              <th scope="col">Latency</th>
+            </tr>
+          </thead>
+          <tbody>
+            {benchmarkRows.map((row) => (
+              <tr key={row.variant} className={row.groundedAccuracy === 100 ? "winner-row" : ""}>
+                <th scope="row">
+                  <strong>{row.variant}</strong>
+                  <span>{row.role}</span>
+                </th>
+                <ScoreCell value={row.accuracy} />
+                <ScoreCell value={row.numericAccuracy} />
+                <ScoreCell value={row.groundedAccuracy} />
+                <ScoreCell value={row.refusalAccuracy} />
+                <ScoreCell value={row.evidenceRecall} />
+                <td>{row.latency}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <section className="failure-grid" aria-label="Benchmark takeaways">
+        {benchmarkFailures.map((failure) => (
+          <article key={failure.label}>
+            <p className="panel-kicker">{failure.label}</p>
+            <p>{failure.text}</p>
+          </article>
+        ))}
+      </section>
+    </div>
+  );
+}
+
+function ScoreCell({ value }: { value: number }) {
+  return (
+    <td>
+      <span className="score-value">{value.toFixed(value % 1 === 0 ? 0 : 1)}%</span>
+      <span className="score-track" aria-hidden="true">
+        <span style={{ width: `${value}%` }} />
+      </span>
+    </td>
   );
 }
 

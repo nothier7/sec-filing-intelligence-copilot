@@ -137,7 +137,7 @@ h2 {
 
 .mode-switch {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   border: 1px solid var(--ink);
   border-radius: 8px;
   overflow: hidden;
@@ -227,6 +227,39 @@ form > button {
   color: var(--teal);
 }
 
+.benchmark-brief {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.benchmark-brief h2 {
+  font-size: 1.45rem;
+}
+
+.benchmark-brief p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.brief-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.benchmark-command {
+  display: block;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--ink);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .answer-panel {
   display: grid;
   align-content: start;
@@ -297,7 +330,15 @@ code {
   gap: 10px;
 }
 
+.benchmark-scoreboard {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 10px;
+}
+
 .metric-grid div,
+.brief-grid div,
+.benchmark-scoreboard div,
 .fact-line,
 .citation-list article,
 .change-grid article,
@@ -315,15 +356,136 @@ code {
   padding: 12px;
 }
 
+.brief-grid div {
+  display: grid;
+  min-height: 72px;
+  align-content: center;
+  gap: 6px;
+  padding: 12px;
+}
+
+.benchmark-scoreboard div {
+  display: grid;
+  min-height: 86px;
+  align-content: center;
+  gap: 8px;
+  padding: 14px;
+  border-top: 6px solid var(--teal);
+}
+
 .metric-grid span,
+.brief-grid span,
+.benchmark-scoreboard span,
 .fact-line span {
   color: var(--muted);
   font-size: 0.82rem;
 }
 
 .metric-grid strong,
+.brief-grid strong,
+.benchmark-scoreboard strong,
 .fact-line strong {
   color: var(--ink);
+}
+
+.benchmark-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.benchmark-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.benchmark-table th,
+.benchmark-table td {
+  padding: 14px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.benchmark-table thead th {
+  background: #eef2f0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
+.benchmark-table tbody tr:last-child th,
+.benchmark-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.benchmark-table tbody th {
+  width: 210px;
+}
+
+.benchmark-table tbody th strong,
+.benchmark-table tbody th span,
+.score-value,
+.score-track {
+  display: block;
+}
+
+.benchmark-table tbody th span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.winner-row th,
+.winner-row td {
+  background: rgba(31, 122, 76, 0.08);
+}
+
+.score-value {
+  margin-bottom: 6px;
+  font-weight: 800;
+}
+
+.score-track {
+  width: 72px;
+  height: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8faf9;
+  overflow: hidden;
+}
+
+.score-track span {
+  display: block;
+  height: 100%;
+  background: var(--teal);
+}
+
+.winner-row .score-track span {
+  background: var(--green);
+}
+
+.failure-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.failure-grid article {
+  min-height: 160px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.failure-grid p:last-child {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.55;
 }
 
 .fact-line {
@@ -432,6 +594,12 @@ code {
   }
 
   .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .benchmark-scoreboard,
+  .brief-grid,
+  .failure-grid {
     grid-template-columns: 1fr;
   }
 }
