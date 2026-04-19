@@ -9,8 +9,16 @@ from sec_copilot.config import get_settings
 
 
 def create_db_engine(database_url: Optional[str] = None) -> Engine:
-    url = database_url or get_settings().database_url
+    url = normalize_database_url(database_url or get_settings().database_url)
     return create_engine(url, pool_pre_ping=True)
+
+
+def normalize_database_url(database_url: str) -> str:
+    if database_url.startswith("postgresql://"):
+        return f"postgresql+psycopg://{database_url.removeprefix('postgresql://')}"
+    if database_url.startswith("postgres://"):
+        return f"postgresql+psycopg://{database_url.removeprefix('postgres://')}"
+    return database_url
 
 
 def create_session_factory(engine: Engine) -> sessionmaker[Session]:
