@@ -66,8 +66,15 @@ PYTHONPATH=backend/src DATABASE_URL=sqlite:///data/sec_copilot_real.db \
 ```
 
 OpenAI predictions are cached under `OPENAI_EVAL_CACHE_DIR`, which defaults to
-`evals/results/cache/openai`. Use `--refresh-openai-cache` when you intentionally
-want to spend API calls again.
+`evals/results/cache/openai`. The cache key includes the model, output budget,
+reasoning effort, context budget, question, and prompt. Use
+`--refresh-openai-cache` when you intentionally want to spend API calls again.
+
+By default, OpenAI eval baselines use `gpt-5-mini`. Override it with
+`OPENAI_EVAL_MODEL` in `.env` or `--openai-model` on the CLI. GPT-5 mini runs
+with `OPENAI_EVAL_REASONING_EFFORT=minimal` and
+`OPENAI_EVAL_MAX_OUTPUT_TOKENS=800` by default so reasoning tokens do not crowd
+out short benchmark answers.
 
 ## JSONL Schema
 

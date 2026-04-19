@@ -1,6 +1,6 @@
 # Apple SEC Filing Evaluation Report
 
-Generated on 2026-04-18 from `evals/questions/aapl_real_2025_2026.jsonl`.
+Generated on 2026-04-19 from `evals/questions/aapl_real_2025_2026.jsonl`.
 
 This benchmark uses locally ingested Apple SEC filings:
 
@@ -13,20 +13,21 @@ The dataset contains 24 questions:
 - 8 disclosure or comparison questions with expected citation chunks.
 - 4 refusal questions for investment advice, forecasts, ambiguous metrics, or unavailable periods.
 
-The OpenAI baselines used `gpt-4.1-mini` with cached predictions under
+The OpenAI baselines used `gpt-5-mini` with cached predictions under
 `evals/results/cache/openai`.
-Latency for cached OpenAI predictions reflects local cache reads on reruns.
+Latency for the tracked OpenAI predictions reflects fresh API calls; cached reruns
+may be much faster.
 
 ## Headline Metrics
 
 | Variant | Accuracy | Numeric Accuracy | Grounded Numeric Accuracy | Refusal Accuracy | Evidence Recall | Avg Latency (ms) | Error Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | closed book | 8.3% | 0.0% | 0.0% | 50.0% | 16.7% | 0.0 | 0.0% |
-| naive rag | 33.3% | 16.7% | 0.0% | 50.0% | 83.3% | 73.8 | 0.0% |
-| improved rag | 54.2% | 16.7% | 0.0% | 75.0% | 100.0% | 39.3 | 0.0% |
-| openai closed book | 12.5% | 0.0% | 0.0% | 50.0% | 16.7% | 0.5 | 0.0% |
-| openai retrieved context | 79.2% | 83.3% | 0.0% | 50.0% | 100.0% | 1911.4 | 0.0% |
-| improved rag xbrl | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 41.9 | 0.0% |
+| naive rag | 33.3% | 16.7% | 0.0% | 50.0% | 83.3% | 65.6 | 0.0% |
+| improved rag | 54.2% | 16.7% | 0.0% | 75.0% | 100.0% | 38.4 | 0.0% |
+| openai closed book | 8.3% | 0.0% | 0.0% | 50.0% | 16.7% | 1791.1 | 0.0% |
+| openai retrieved context | 50.0% | 66.7% | 0.0% | 50.0% | 100.0% | 1717.2 | 0.0% |
+| improved rag xbrl | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 40.2 | 0.0% |
 
 ## What The Ablation Shows
 
@@ -36,27 +37,29 @@ Latency for cached OpenAI predictions reflects local cache reads on reruns.
 
 `improved_rag` applies metadata filters such as form type, fiscal period, and section type. It reaches perfect evidence recall on this dataset, but still has no structured numeric grounding.
 
-`openai_closed_book` asks `gpt-4.1-mini` without filing excerpts. It often answers
-with plausible but incorrect numbers, which is the risk this project is designed
-to avoid.
+`openai_closed_book` asks `gpt-5-mini` without filing excerpts. It correctly
+refuses many evidence-dependent questions, which is safer than hallucinating but
+still not useful for filing analysis.
 
-`openai_retrieved_context` asks `gpt-4.1-mini` with retrieved filing excerpts. It
-answers many numeric questions correctly from context, but it still has 0% grounded
-numeric accuracy because it has no structured XBRL validation layer.
+`openai_retrieved_context` asks `gpt-5-mini` with retrieved filing excerpts. It
+answers several numeric questions correctly from context, but still misses some
+supported questions and has 0% grounded numeric accuracy because it has no
+structured XBRL validation layer.
 
 `improved_rag_xbrl` combines metadata-aware retrieval with XBRL fact lookup and citation validation. It is the only variant that reaches 100% numeric accuracy, 100% grounded numeric accuracy, and 100% refusal accuracy on this dataset.
 
 ## Example Baseline Failures
 
-OpenAI closed-book answered the 2025 revenue question with `$394,328,000,000`,
-while the validated SEC/XBRL value is `$416,161,000,000`.
+OpenAI closed-book refused the 2025 revenue question because it had no filing
+evidence. The validated SEC/XBRL value is `$416,161,000,000`.
 
-OpenAI closed-book answered the 2025 R&D question with `$38.66 billion`, while the
-validated SEC/XBRL value is `$34.55 billion`.
+OpenAI with retrieved context answered the 2025 revenue question correctly from
+retrieved excerpts, but it still lacked grounded XBRL validation.
 
-OpenAI with retrieved context answered most numeric questions correctly, but still
-answered the ambiguous prompt "How much did Apple spend in 2025?" with operating
-expense details instead of refusing and asking for a specific metric.
+OpenAI with retrieved context refused the 2025 R&D and operating expense
+questions even though the relevant retrieved filing excerpt contained the
+operating expense table. The XBRL-grounded variant answered both with validated
+structured facts.
 
 ## Resume Signal
 

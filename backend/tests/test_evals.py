@@ -5,8 +5,14 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from sec_copilot.answering import Citation
+from sec_copilot.config import Settings
 from sec_copilot.db.models import Company, Filing, XbrlFact
 from sec_copilot.evals import EvaluationRunner, EvalVariant, format_eval_report, load_eval_questions
+from sec_copilot.evals.openai_baseline import (
+    OpenAIEvalClient,
+    OpenAIEvalRequest,
+    _supports_reasoning,
+)
 from sec_copilot.evals.metrics import score_prediction
 from sec_copilot.evals.models import EvalExpected, EvalPrediction, EvalQuestion
 from sec_copilot.filings import FilingParseService
@@ -55,6 +61,51 @@ def test_numeric_value_scoring_handles_external_llm_answer_without_grounding() -
     assert score["numeric_match"] == 1.0
     assert score["numeric_grounding_match"] == 0.0
     assert score["answer_correct"] == 1.0
+
+
+def test_openai_cache_key_includes_model_runtime_settings(tmp_path: Path) -> None:
+    question = EvalQuestion(
+        id="numeric",
+        question="How much revenue did Apple report?",
+        accession_number="0000320193-25-000079",
+        expected=EvalExpected(supported=True),
+    )
+    settings = Settings(
+        openai_eval_cache_dir=tmp_path.as_posix(),
+        openai_eval_model="gpt-5-mini",
+        openai_eval_max_output_tokens=800,
+        openai_eval_reasoning_effort="minimal",
+        openai_eval_context_chars=3500,
+    )
+    client = OpenAIEvalClient(settings=settings)
+    request = OpenAIEvalRequest(question=question, variant=EvalVariant.OPENAI_CLOSED_BOOK)
+    prompt = "Question: How much revenue did Apple report?"
+
+    first_path = client._cache_path(
+        request=request,
+        prompt=prompt,
+    )
+    changed_budget_client = OpenAIEvalClient(
+        settings=settings.model_copy(update={"openai_eval_max_output_tokens": 1200})
+    )
+    changed_reasoning_client = OpenAIEvalClient(
+        settings=settings.model_copy(update={"openai_eval_reasoning_effort": "low"})
+    )
+
+    assert first_path != changed_budget_client._cache_path(
+        request=request,
+        prompt=prompt,
+    )
+    assert first_path != changed_reasoning_client._cache_path(
+        request=request,
+        prompt=prompt,
+    )
+
+
+def test_openai_reasoning_support_detection() -> None:
+    assert _supports_reasoning("gpt-5-mini")
+    assert _supports_reasoning("o4-mini")
+    assert not _supports_reasoning("gpt-4.1-mini")
 
 
 def test_evaluation_runner_compares_rag_variants(session: Session) -> None:

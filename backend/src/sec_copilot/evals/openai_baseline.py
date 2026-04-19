@@ -88,13 +88,18 @@ class OpenAIEvalClient:
         if not self.settings.openai_api_key:
             raise ValueError("OPENAI_API_KEY is required for OpenAI eval variants")
 
+        instructions = _instructions_for(request.variant)
         payload = {
             "model": self.model,
-            "instructions": _instructions_for(request.variant),
+            "instructions": instructions,
             "input": prompt,
             "max_output_tokens": self.settings.openai_eval_max_output_tokens,
             "store": False,
         }
+        if _supports_reasoning(self.model) and self.settings.openai_eval_reasoning_effort:
+            payload["reasoning"] = {
+                "effort": self.settings.openai_eval_reasoning_effort,
+            }
         with httpx.Client(timeout=60.0) as client:
             response = client.post(
                 f"{self.settings.openai_base_url.rstrip('/')}/responses",
@@ -127,6 +132,10 @@ class OpenAIEvalClient:
                 {
                     "variant": request.variant.value,
                     "model": self.model,
+                    "max_output_tokens": self.settings.openai_eval_max_output_tokens,
+                    "reasoning_effort": self.settings.openai_eval_reasoning_effort,
+                    "context_chars": self.settings.openai_eval_context_chars,
+                    "instructions": _instructions_for(request.variant),
                     "question_id": request.question.id,
                     "question": request.question.question,
                     "prompt": prompt,
@@ -141,14 +150,19 @@ class OpenAIEvalClient:
 def _instructions_for(variant: EvalVariant) -> str:
     base = (
         "You are an SEC filing benchmark baseline. Answer the user's question directly. "
-        "If the prompt does not contain enough evidence to answer confidently, say exactly: "
+        "If the prompt truly does not contain enough evidence to answer confidently, say exactly: "
         "\"I do not have enough filing evidence to answer that confidently.\" "
         "Do not give investment advice, forecasts, or price targets."
     )
     if variant == EvalVariant.OPENAI_RETRIEVED_CONTEXT:
         return (
-            f"{base} Use only the provided filing excerpts. If the excerpts conflict or do not "
-            "support the answer, use the insufficient-evidence sentence."
+            f"{base} Use only the provided filing excerpts. Treat the excerpts as authoritative "
+            "SEC filing evidence for the accession named in the prompt; do not require the "
+            "accession number to appear inside the excerpt text. For descriptive questions, one "
+            "relevant excerpt is enough evidence. For numeric questions, flattened table rows are "
+            "valid evidence, and dollar amounts are commonly in millions when the excerpt says so. "
+            "If the excerpts conflict or do not support the answer, use the insufficient-evidence "
+            "sentence."
         )
     return base
 
@@ -195,6 +209,10 @@ def _extract_response_text(raw_response: dict[str, Any]) -> str:
             if content.get("type") in {"output_text", "text"} and content.get("text"):
                 text_parts.append(str(content["text"]))
     return " ".join(part.strip() for part in text_parts if part.strip()).strip()
+
+
+def _supports_reasoning(model: str) -> bool:
+    return model.startswith(("gpt-5", "o1", "o3", "o4"))
 
 
 def _clip(value: str, max_chars: int) -> str:
