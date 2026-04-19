@@ -47,7 +47,7 @@ const benchmarkRows = [
     groundedAccuracy: 0,
     refusalAccuracy: 50,
     evidenceRecall: 83.3,
-    latency: "65.6 ms"
+    latency: "42.1 ms"
   },
   {
     variant: "Filtered RAG",
@@ -57,7 +57,7 @@ const benchmarkRows = [
     groundedAccuracy: 0,
     refusalAccuracy: 75,
     evidenceRecall: 100,
-    latency: "38.4 ms"
+    latency: "37.2 ms"
   },
   {
     variant: "GPT-5 mini closed book",
@@ -67,17 +67,27 @@ const benchmarkRows = [
     groundedAccuracy: 0,
     refusalAccuracy: 50,
     evidenceRecall: 16.7,
-    latency: "1791.1 ms"
+    latency: "cached"
   },
   {
     variant: "GPT-5 mini + retrieved context",
     role: "External model with excerpts",
-    accuracy: 50,
-    numericAccuracy: 66.7,
+    accuracy: 41.7,
+    numericAccuracy: 58.3,
     groundedAccuracy: 0,
     refusalAccuracy: 50,
     evidenceRecall: 100,
-    latency: "1717.2 ms"
+    latency: "cached"
+  },
+  {
+    variant: "GPT-5 mini + web search",
+    role: "External model with web access",
+    accuracy: 62.5,
+    numericAccuracy: 75,
+    groundedAccuracy: 0,
+    refusalAccuracy: 100,
+    evidenceRecall: 16.7,
+    latency: "cached"
   },
   {
     variant: "Filtered RAG + XBRL",
@@ -104,8 +114,8 @@ const benchmarkFailures = [
     text: "GPT-5 mini refused the 2025 revenue question without filing evidence. The validated XBRL value is $416.161B."
   },
   {
-    label: "Context-only limit",
-    text: "GPT-5 mini with retrieved excerpts answered several numbers correctly, but still had 0% grounded numeric accuracy."
+    label: "Web-search limit",
+    text: "GPT-5 mini with web search found many public numbers, but still had 0% grounded numeric accuracy."
   },
   {
     label: "Structured fix",
@@ -496,7 +506,7 @@ function BenchmarkResult() {
       <div className="benchmark-scoreboard" aria-label="Benchmark headline metrics">
         <Metric label="Best overall accuracy" value="100%" />
         <Metric label="Best grounded numeric accuracy" value="100%" />
-        <Metric label="OpenAI context grounded accuracy" value="0%" />
+        <Metric label="OpenAI web grounded accuracy" value="0%" />
       </div>
 
       <div className="benchmark-table-wrap">

@@ -97,6 +97,7 @@ def build_parser() -> argparse.ArgumentParser:
             "improved_rag_xbrl",
             "openai_closed_book",
             "openai_retrieved_context",
+            "openai_web_search",
         ],
         help="Variant to run. Repeat to run multiple variants. Defaults to all variants.",
     )

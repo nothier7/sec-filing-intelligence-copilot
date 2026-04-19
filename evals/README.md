@@ -1,6 +1,7 @@
 # Evaluation Harness
 
-The benchmark runner compares SEC Copilot answer quality across four variants:
+The benchmark runner compares SEC Copilot answer quality across local RAG, XBRL,
+and OpenAI baseline variants:
 
 - `closed_book`: no filing retrieval.
 - `naive_rag`: retrieval over the whole filing without metadata filters.
@@ -9,6 +10,8 @@ The benchmark runner compares SEC Copilot answer quality across four variants:
 - `openai_closed_book`: configured OpenAI model without filing excerpts.
 - `openai_retrieved_context`: configured OpenAI model with retrieved filing excerpts,
   but without XBRL fact grounding.
+- `openai_web_search`: configured OpenAI model with web search enabled, but without
+  local-corpus controls or XBRL fact grounding.
 
 Run the default benchmark:
 
@@ -44,9 +47,12 @@ PYTHONPATH=backend/src DATABASE_URL=sqlite:///data/sec_copilot_real.db \
 The current tracked benchmark report is `reports/aapl_real_eval.md`. In the latest
 local run, `improved_rag_xbrl` reached 100% accuracy, 100% numeric accuracy, 100%
 grounded numeric accuracy, 100% refusal accuracy, and 100% evidence recall across
-24 real SEC questions. `openai_retrieved_context` reached 79.2% accuracy and 83.3%
+24 real SEC questions. `openai_retrieved_context` reached 41.7% accuracy and 58.3%
 numeric accuracy, but 0% grounded numeric accuracy because it does not validate
 answers against structured XBRL facts.
+The web-search baseline reached 62.5% accuracy and 75.0% numeric accuracy, but
+still had 0% grounded numeric accuracy because web citations are not structured
+XBRL validation.
 
 To include OpenAI baselines, add `OPENAI_API_KEY` to your local `.env` and pass the
 OpenAI variants explicitly:
@@ -61,6 +67,7 @@ PYTHONPATH=backend/src DATABASE_URL=sqlite:///data/sec_copilot_real.db \
   --variant improved_rag_xbrl \
   --variant openai_closed_book \
   --variant openai_retrieved_context \
+  --variant openai_web_search \
   --output evals/results/aapl_real_openai_eval.json \
   --report evals/results/aapl_real_openai_eval.md
 ```
@@ -75,6 +82,10 @@ By default, OpenAI eval baselines use `gpt-5-mini`. Override it with
 with `OPENAI_EVAL_REASONING_EFFORT=minimal` and
 `OPENAI_EVAL_MAX_OUTPUT_TOKENS=800` by default so reasoning tokens do not crowd
 out short benchmark answers.
+
+The `openai_web_search` variant uses `OPENAI_EVAL_WEB_SEARCH_REASONING_EFFORT=low`
+because GPT-5 web search does not support minimal reasoning. It also supports
+`OPENAI_EVAL_WEB_SEARCH_CONTEXT_SIZE` and `OPENAI_EVAL_WEB_SEARCH_MAX_TOOL_CALLS`.
 
 ## JSONL Schema
 

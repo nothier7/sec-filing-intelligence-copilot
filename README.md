@@ -198,8 +198,10 @@ The real Apple benchmark at `evals/questions/aapl_real_2025_2026.jsonl` covers 2
 questions across the FY2025 10-K and Q1 FY2026 10-Q. In the latest local run,
 `improved_rag_xbrl` reached 100% accuracy, 100% numeric accuracy, 100% grounded
 numeric accuracy, 100% refusal accuracy, and 100% evidence recall. The OpenAI
-retrieved-context baseline reached 79.2% accuracy and 83.3% numeric accuracy, but
-0% grounded numeric accuracy because it does not validate answers against XBRL.
+retrieved-context baseline reached 41.7% accuracy and 58.3% numeric accuracy,
+while the OpenAI web-search baseline reached 62.5% accuracy and 75.0% numeric
+accuracy. Both OpenAI baselines had 0% grounded numeric accuracy because they do
+not validate answers against XBRL.
 See [reports/aapl_real_eval.md](reports/aapl_real_eval.md) for the tracked report
 and [evals/README.md](evals/README.md) for the benchmark schema.
 

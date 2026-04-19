@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     openai_eval_model: str = "gpt-5-mini"
     openai_eval_max_output_tokens: int = 800
     openai_eval_reasoning_effort: str = "minimal"
+    openai_eval_web_search_reasoning_effort: str = "low"
+    openai_eval_web_search_context_size: str = "low"
+    openai_eval_web_search_max_tool_calls: int = 3
     openai_eval_cache_dir: str = "evals/results/cache/openai"
     openai_eval_context_chars: int = 3500
 

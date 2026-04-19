@@ -5,12 +5,15 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from sec_copilot.answering import Citation
+from sec_copilot.answering.models import QueryType
 from sec_copilot.config import Settings
 from sec_copilot.db.models import Company, Filing, XbrlFact
 from sec_copilot.evals import EvaluationRunner, EvalVariant, format_eval_report, load_eval_questions
 from sec_copilot.evals.openai_baseline import (
     OpenAIEvalClient,
     OpenAIEvalRequest,
+    _extract_web_citations,
+    _insufficient_reason,
     _supports_reasoning,
 )
 from sec_copilot.evals.metrics import score_prediction
@@ -106,6 +109,98 @@ def test_openai_reasoning_support_detection() -> None:
     assert _supports_reasoning("gpt-5-mini")
     assert _supports_reasoning("o4-mini")
     assert not _supports_reasoning("gpt-4.1-mini")
+
+
+def test_openai_web_search_payload_uses_web_tool_and_low_reasoning(tmp_path: Path) -> None:
+    question = EvalQuestion(
+        id="web",
+        question="How much revenue did Apple report in 2025?",
+        accession_number="0000320193-25-000079",
+        expected=EvalExpected(supported=True),
+    )
+    settings = Settings(
+        openai_eval_cache_dir=tmp_path.as_posix(),
+        openai_eval_model="gpt-5-mini",
+        openai_eval_reasoning_effort="minimal",
+        openai_eval_web_search_reasoning_effort="low",
+        openai_eval_web_search_context_size="low",
+        openai_eval_web_search_max_tool_calls=3,
+    )
+    client = OpenAIEvalClient(settings=settings)
+
+    payload = client._payload_for(
+        request=OpenAIEvalRequest(question=question, variant=EvalVariant.OPENAI_WEB_SEARCH),
+        prompt="Question: How much revenue did Apple report in 2025?",
+    )
+
+    assert payload["tools"] == [{"type": "web_search", "search_context_size": "low"}]
+    assert payload["tool_choice"] == "auto"
+    assert payload["max_tool_calls"] == 3
+    assert payload["include"] == ["web_search_call.action.sources"]
+    assert payload["reasoning"] == {"effort": "low"}
+
+
+def test_extract_web_citations_from_response_annotations() -> None:
+    citations = _extract_web_citations(
+        {
+            "output": [
+                {
+                    "type": "message",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": "Apple reported revenue.",
+                            "annotations": [
+                                {
+                                    "type": "url_citation",
+                                    "url": "https://www.sec.gov/example",
+                                    "title": "Apple 10-K",
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+    assert len(citations) == 1
+    assert citations[0].chunk_id.startswith("web:")
+    assert citations[0].section_type == "web"
+    assert citations[0].source_url == "https://www.sec.gov/example"
+    assert citations[0].snippet == "Apple 10-K"
+
+
+def test_openai_refusal_reason_handles_advice_and_metric_clarification() -> None:
+    advice_question = EvalQuestion(
+        id="advice",
+        question="Should I buy Apple stock?",
+        accession_number="0000320193-25-000079",
+        expected=EvalExpected(supported=False),
+    )
+    spend_question = EvalQuestion(
+        id="spend",
+        question="How much did Apple spend in 2025?",
+        accession_number="0000320193-25-000079",
+        expected=EvalExpected(supported=False),
+    )
+
+    assert (
+        _insufficient_reason(
+            "I can’t tell you to buy or not.",
+            QueryType.UNSUPPORTED,
+            advice_question,
+        )
+        == "unsupported_query_type"
+    )
+    assert (
+        _insufficient_reason(
+            "Do you mean operating expenses or capital expenditures?",
+            QueryType.NUMERIC,
+            spend_question,
+        )
+        == "no_metric_match"
+    )
 
 
 def test_evaluation_runner_compares_rag_variants(session: Session) -> None:

@@ -112,6 +112,10 @@ class EvaluationRunner:
                 return self.openai_client.predict(
                     OpenAIEvalRequest(question=question, variant=variant)
                 )
+            if variant == EvalVariant.OPENAI_WEB_SEARCH:
+                return self.openai_client.predict(
+                    OpenAIEvalRequest(question=question, variant=variant)
+                )
             if variant == EvalVariant.OPENAI_RETRIEVED_CONTEXT:
                 return self._openai_retrieved_context_prediction(question, variant)
             return self._rag_prediction(question, variant, started_at)

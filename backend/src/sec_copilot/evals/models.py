@@ -16,6 +16,7 @@ class EvalVariant(str, Enum):
     IMPROVED_RAG_XBRL = "improved_rag_xbrl"
     OPENAI_CLOSED_BOOK = "openai_closed_book"
     OPENAI_RETRIEVED_CONTEXT = "openai_retrieved_context"
+    OPENAI_WEB_SEARCH = "openai_web_search"
 
 
 class EvalExpected(BaseModel):
