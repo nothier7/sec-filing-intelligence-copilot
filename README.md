@@ -203,12 +203,14 @@ The tracked real-filing benchmarks cover 48 questions across Apple and Microsoft
 filings. Apple uses the FY2025 10-K and Q1 FY2026 10-Q. Microsoft uses the
 FY2025 10-K and Q2 FY2026 10-Q.
 
-Across both issuers, `improved_rag_xbrl` reached 100% accuracy, 100% numeric
-accuracy, 100% grounded numeric accuracy, 100% refusal accuracy, and 100%
-evidence recall. The OpenAI retrieved-context baseline averaged 37.5% accuracy
-and 50.0% numeric accuracy. The OpenAI web-search baseline averaged 41.7%
-accuracy and 45.8% numeric accuracy. Both OpenAI baselines had 0% grounded
-numeric accuracy because they do not validate answers against XBRL.
+Across both issuers, `improved_rag_xbrl` and `improved_rag_xbrl_llm` reached
+100% accuracy, 100% numeric accuracy, 100% grounded numeric accuracy, 100%
+refusal accuracy, and 100% evidence recall. The guarded LLM variant averaged
+about 2.0 seconds per question while preserving the deterministic XBRL checks.
+The OpenAI retrieved-context baseline averaged 37.5% accuracy and 50.0% numeric
+accuracy. The OpenAI web-search baseline averaged 41.7% accuracy and 45.8%
+numeric accuracy. Both OpenAI baselines had 0% grounded numeric accuracy because
+they do not validate answers against XBRL.
 
 See [reports/aapl_real_eval.md](reports/aapl_real_eval.md),
 [reports/msft_real_eval.md](reports/msft_real_eval.md), and

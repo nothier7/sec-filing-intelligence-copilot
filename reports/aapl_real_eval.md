@@ -13,22 +13,25 @@ The dataset contains 24 questions:
 - 8 disclosure or comparison questions with expected citation chunks.
 - 4 refusal questions for investment advice, forecasts, ambiguous metrics, or unavailable periods.
 
-The OpenAI baselines used `gpt-5-mini` with cached predictions under
-`evals/results/cache/openai`. The web-search baseline uses the OpenAI Responses
-API `web_search` tool. OpenAI latency in this tracked report reflects a cached
-scoring rerun; quality metrics are the comparison point.
+The OpenAI baselines and guarded synthesis layer used `gpt-5-mini`. Cached
+baseline predictions live under `evals/results/cache/openai`. The web-search
+baseline uses the OpenAI Responses API `web_search` tool. OpenAI baseline
+latency in this tracked report reflects a cached scoring rerun; quality metrics
+are the comparison point. Guarded synthesis latency reflects live answer
+polishing calls.
 
 ## Headline Metrics
 
 | Variant | Accuracy | Numeric Accuracy | Grounded Numeric Accuracy | Refusal Accuracy | Evidence Recall | Avg Latency (ms) | Error Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | closed book | 8.3% | 0.0% | 0.0% | 50.0% | 16.7% | 0.0 | 0.0% |
-| naive rag | 33.3% | 16.7% | 0.0% | 50.0% | 83.3% | 42.1 | 0.0% |
-| improved rag | 54.2% | 16.7% | 0.0% | 75.0% | 100.0% | 37.2 | 0.0% |
-| openai closed book | 8.3% | 0.0% | 0.0% | 50.0% | 16.7% | 0.5 | 0.0% |
-| openai retrieved context | 41.7% | 58.3% | 0.0% | 50.0% | 100.0% | 0.7 | 0.0% |
-| openai web search | 62.5% | 75.0% | 0.0% | 100.0% | 16.7% | 0.3 | 0.0% |
-| improved rag xbrl | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 40.2 | 0.0% |
+| naive rag | 33.3% | 16.7% | 0.0% | 50.0% | 83.3% | 45.6 | 0.0% |
+| improved rag | 54.2% | 16.7% | 0.0% | 75.0% | 100.0% | 38.7 | 0.0% |
+| openai closed book | 8.3% | 0.0% | 0.0% | 50.0% | 16.7% | 1.2 | 0.0% |
+| openai retrieved context | 41.7% | 58.3% | 0.0% | 50.0% | 100.0% | 0.8 | 0.0% |
+| openai web search | 62.5% | 75.0% | 0.0% | 100.0% | 16.7% | 0.4 | 0.0% |
+| improved rag xbrl | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 41.9 | 0.0% |
+| improved rag xbrl llm | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 2144.5 | 0.0% |
 
 ## What The Ablation Shows
 
@@ -53,7 +56,15 @@ but it still has 0% grounded numeric accuracy and low local evidence recall
 because it does not validate answers against parsed XBRL facts or expected local
 filing chunks.
 
-`improved_rag_xbrl` combines metadata-aware retrieval with XBRL fact lookup and citation validation. It is the only variant that reaches 100% numeric accuracy, 100% grounded numeric accuracy, and 100% refusal accuracy on this dataset.
+`improved_rag_xbrl` combines metadata-aware retrieval with XBRL fact lookup and
+citation validation. It reaches 100% numeric accuracy, 100% grounded numeric
+accuracy, and 100% refusal accuracy on this dataset.
+
+`improved_rag_xbrl_llm` adds guarded GPT-5 mini synthesis after the deterministic
+XBRL answer is already supported. It preserves the same 100% metrics while
+returning a more natural answer. The LLM cannot change support status, citations,
+or numeric grounding; if validation fails, the system returns the deterministic
+answer instead.
 
 ## Example Baseline Failures
 
@@ -83,9 +94,12 @@ This benchmark demonstrates more than a chatbot wrapper:
 - Evidence-constrained answers over real SEC filings.
 - Deterministic citation checks against expected filing chunks.
 - Structured XBRL validation for financial metrics.
+- Guarded LLM synthesis that improves answer readability without changing
+  support status, citations, or validated facts.
 - Refusal behavior for unsupported, ambiguous, or unavailable questions.
 - A repeatable ablation comparing closed-book, naive RAG, filtered RAG, OpenAI
-  no-web, OpenAI retrieved-context, OpenAI web-search, and filtered RAG plus XBRL.
+  no-web, OpenAI retrieved-context, OpenAI web-search, filtered RAG plus XBRL,
+  and guarded LLM synthesis.
 
 ## Reproduce
 
@@ -99,6 +113,7 @@ PYTHONPATH=backend/src DATABASE_URL=sqlite:///data/sec_copilot_real.db \
   --variant naive_rag \
   --variant improved_rag \
   --variant improved_rag_xbrl \
+  --variant improved_rag_xbrl_llm \
   --variant openai_closed_book \
   --variant openai_retrieved_context \
   --variant openai_web_search \

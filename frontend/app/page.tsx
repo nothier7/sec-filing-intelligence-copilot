@@ -84,7 +84,7 @@ const benchmarkRows = [
     groundedAccuracy: 0,
     refusalAccuracy: 50,
     evidenceRecall: 74,
-    latency: "62.8 ms"
+    latency: "52.3 ms"
   },
   {
     variant: "Filtered RAG",
@@ -94,7 +94,7 @@ const benchmarkRows = [
     groundedAccuracy: 0,
     refusalAccuracy: 75,
     evidenceRecall: 100,
-    latency: "46.4 ms"
+    latency: "47.1 ms"
   },
   {
     variant: "GPT-5 mini closed book",
@@ -134,7 +134,17 @@ const benchmarkRows = [
     groundedAccuracy: 100,
     refusalAccuracy: 100,
     evidenceRecall: 100,
-    latency: "49.5 ms"
+    latency: "50.2 ms"
+  },
+  {
+    variant: "Guarded LLM + XBRL",
+    role: "Polished answer with fact guards",
+    accuracy: 100,
+    numericAccuracy: 100,
+    groundedAccuracy: 100,
+    refusalAccuracy: 100,
+    evidenceRecall: 100,
+    latency: "2.0 s"
   }
 ];
 
@@ -156,7 +166,7 @@ const benchmarkFailures = [
   },
   {
     label: "Structured fix",
-    text: "The strongest variant combines metadata-filtered retrieval, citation checks, refusal handling, and XBRL fact validation."
+    text: "The guarded path keeps XBRL facts authoritative, lets GPT-5 mini polish only supported answers, and falls back when validation fails."
   }
 ];
 
@@ -561,7 +571,7 @@ function BenchmarkBrief() {
         ))}
       </div>
       <code className="benchmark-command">
-        .venv/bin/python -m sec_copilot.cli run-eval --variant improved_rag_xbrl
+        .venv/bin/python -m sec_copilot.cli run-eval --variant improved_rag_xbrl_llm
       </code>
     </section>
   );
@@ -592,7 +602,7 @@ function BenchmarkResult() {
       <div className="benchmark-scoreboard" aria-label="Benchmark headline metrics">
         <Metric label="Best overall accuracy" value="100%" />
         <Metric label="Best grounded numeric accuracy" value="100%" />
-        <Metric label="OpenAI web grounded accuracy" value="0%" />
+        <Metric label="Guarded synthesis latency" value="2.0s avg" />
       </div>
 
       <div className="benchmark-table-wrap">

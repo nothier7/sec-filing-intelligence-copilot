@@ -16,22 +16,25 @@ The dataset contains 24 questions:
 - 8 disclosure questions with expected citation chunks.
 - 4 refusal questions for investment advice, forecasts, ambiguous metrics, or unavailable periods.
 
-The OpenAI baselines used `gpt-5-mini`. Cached predictions live under
-`evals/results/cache/openai`. The web-search baseline uses the OpenAI Responses
-API `web_search` tool. Unlike the Apple tracked report, the OpenAI latency here
-reflects a fresh API run for Microsoft.
+The OpenAI baselines and guarded synthesis layer used `gpt-5-mini`. Cached
+baseline predictions live under `evals/results/cache/openai`. The web-search
+baseline uses the OpenAI Responses API `web_search` tool. OpenAI baseline
+latency in this tracked report reflects a cached scoring rerun; quality metrics
+are the comparison point. Guarded synthesis latency reflects live answer
+polishing calls.
 
 ## Headline Metrics
 
 | Variant | Accuracy | Numeric Accuracy | Grounded Numeric Accuracy | Refusal Accuracy | Evidence Recall | Avg Latency (ms) | Error Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | closed book | 8.3% | 0.0% | 0.0% | 50.0% | 16.7% | 0.0 | 0.0% |
-| naive rag | 29.2% | 16.7% | 0.0% | 50.0% | 64.6% | 83.5 | 0.0% |
+| naive rag | 29.2% | 16.7% | 0.0% | 50.0% | 64.6% | 58.9 | 0.0% |
 | improved rag | 50.0% | 8.3% | 0.0% | 75.0% | 100.0% | 55.6 | 0.0% |
-| openai closed book | 8.3% | 0.0% | 0.0% | 50.0% | 16.7% | 1850.6 | 0.0% |
-| openai retrieved context | 33.3% | 41.7% | 0.0% | 50.0% | 100.0% | 1918.1 | 0.0% |
-| openai web search | 20.8% | 16.7% | 0.0% | 50.0% | 16.7% | 20216.1 | 0.0% |
-| improved rag xbrl | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 58.8 | 0.0% |
+| openai closed book | 8.3% | 0.0% | 0.0% | 50.0% | 16.7% | 1.2 | 0.0% |
+| openai retrieved context | 33.3% | 41.7% | 0.0% | 50.0% | 100.0% | 0.9 | 0.0% |
+| openai web search | 20.8% | 16.7% | 0.0% | 50.0% | 16.7% | 0.4 | 0.0% |
+| improved rag xbrl | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 58.5 | 0.0% |
+| improved rag xbrl llm | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 1852.4 | 0.0% |
 
 ## What The Ablation Shows
 
@@ -57,6 +60,12 @@ local corpus. It also has 0% grounded numeric accuracy.
 lookup and citation validation. It reaches 100% accuracy, 100% numeric accuracy,
 100% grounded numeric accuracy, 100% refusal accuracy, and 100% evidence recall
 on the Microsoft dataset.
+
+`improved_rag_xbrl_llm` adds guarded GPT-5 mini synthesis after the deterministic
+XBRL answer is already supported. It preserves the same 100% metrics while
+returning a more natural answer. The LLM cannot change support status, citations,
+or numeric grounding; if validation fails, the system returns the deterministic
+answer instead.
 
 ## Example Baseline Failures
 
@@ -86,6 +95,8 @@ This is the comparison a hiring manager can understand:
 - Generic model with retrieved excerpts: useful context but no structured validation.
 - Generic model with web search: can find public numbers but may round, cite outside the corpus, or miss exact table values.
 - SEC Copilot with XBRL grounding: exact financial facts, local citations, and deterministic refusal behavior.
+- SEC Copilot with guarded LLM synthesis: the same grounded metrics with more
+  natural answer wording and deterministic fallback.
 
 ## Reproduce
 
@@ -99,6 +110,7 @@ PYTHONPATH=backend/src DATABASE_URL=sqlite:///data/sec_copilot_real.db \
   --variant naive_rag \
   --variant improved_rag \
   --variant improved_rag_xbrl \
+  --variant improved_rag_xbrl_llm \
   --variant openai_closed_book \
   --variant openai_retrieved_context \
   --variant openai_web_search \
