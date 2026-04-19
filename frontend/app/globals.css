@@ -160,13 +160,46 @@ h2 {
   color: var(--panel);
 }
 
+.answer-mode-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.answer-mode-toggle button {
+  min-height: 42px;
+  border: 0;
+  background: var(--panel);
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.answer-mode-toggle button + button {
+  border-left: 1px solid var(--ink);
+}
+
+.answer-mode-toggle button.active {
+  background: var(--teal);
+  color: var(--panel);
+}
+
+.mode-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 form {
   display: grid;
   gap: 10px;
   margin-top: 18px;
 }
 
-label {
+label,
+.field-label {
   margin-top: 10px;
   color: var(--muted);
   font-size: 0.78rem;
@@ -340,6 +373,7 @@ code {
 .brief-grid div,
 .benchmark-scoreboard div,
 .fact-line,
+.synthesis-line,
 .citation-list article,
 .change-grid article,
 .error-box {
@@ -493,6 +527,23 @@ code {
   gap: 10px;
   padding: 16px;
   border-left: 6px solid var(--green);
+}
+
+.synthesis-line {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-left: 6px solid var(--teal);
+}
+
+.synthesis-line.fallback,
+.synthesis-line.unavailable {
+  border-left-color: var(--gold);
+}
+
+.synthesis-line span {
+  color: var(--muted);
+  line-height: 1.45;
 }
 
 .fact-line div {

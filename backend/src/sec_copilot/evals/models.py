@@ -14,6 +14,7 @@ class EvalVariant(str, Enum):
     NAIVE_RAG = "naive_rag"
     IMPROVED_RAG = "improved_rag"
     IMPROVED_RAG_XBRL = "improved_rag_xbrl"
+    IMPROVED_RAG_XBRL_LLM = "improved_rag_xbrl_llm"
     OPENAI_CLOSED_BOOK = "openai_closed_book"
     OPENAI_RETRIEVED_CONTEXT = "openai_retrieved_context"
     OPENAI_WEB_SEARCH = "openai_web_search"

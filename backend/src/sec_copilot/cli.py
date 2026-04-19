@@ -62,6 +62,12 @@ def build_parser() -> argparse.ArgumentParser:
     ask.add_argument("question", help="Question to answer")
     ask.add_argument("--top-k", type=int, default=5, help="Number of chunks to retrieve")
     ask.add_argument("--section-type", help="Optional normalized section type filter")
+    ask.add_argument(
+        "--answer-mode",
+        choices=["extractive", "llm"],
+        default="extractive",
+        help="Answer mode: deterministic extractive answer or guarded LLM synthesis",
+    )
 
     compare = subparsers.add_parser(
         "compare-sec-filing",
@@ -95,6 +101,7 @@ def build_parser() -> argparse.ArgumentParser:
             "naive_rag",
             "improved_rag",
             "improved_rag_xbrl",
+            "improved_rag_xbrl_llm",
             "openai_closed_book",
             "openai_retrieved_context",
             "openai_web_search",
@@ -197,6 +204,7 @@ def main() -> None:
                     accession_number=args.accession_number,
                     question=args.question,
                     top_k=args.top_k,
+                    answer_mode=args.answer_mode,
                     section_type=args.section_type,
                 )
             )

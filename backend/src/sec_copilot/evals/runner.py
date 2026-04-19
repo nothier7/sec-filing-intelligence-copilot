@@ -7,7 +7,13 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from sec_copilot.answering import AskRequest, Citation, CitedAnswerService, classify_query
+from sec_copilot.answering import (
+    AnswerMode,
+    AskRequest,
+    Citation,
+    CitedAnswerService,
+    classify_query,
+)
 from sec_copilot.answering.models import QueryType
 from sec_copilot.answering.synthesis import (
     best_evidence_snippet,
@@ -214,16 +220,27 @@ class EvaluationRunner:
         use_improved_filters = variant in {
             EvalVariant.IMPROVED_RAG,
             EvalVariant.IMPROVED_RAG_XBRL,
+            EvalVariant.IMPROVED_RAG_XBRL_LLM,
         }
+        use_xbrl = variant in {
+            EvalVariant.IMPROVED_RAG_XBRL,
+            EvalVariant.IMPROVED_RAG_XBRL_LLM,
+        }
+        answer_mode = (
+            AnswerMode.LLM
+            if variant == EvalVariant.IMPROVED_RAG_XBRL_LLM
+            else AnswerMode.EXTRACTIVE
+        )
         response = CitedAnswerService(
             session=self.session,
             embed_model=self.embed_model,
-            enable_numeric_grounding=variant == EvalVariant.IMPROVED_RAG_XBRL,
+            enable_numeric_grounding=use_xbrl,
         ).answer(
             AskRequest(
                 question=question.question,
                 accession_number=question.accession_number,
                 top_k=question.top_k,
+                answer_mode=answer_mode,
                 cik=question.cik if use_improved_filters else None,
                 form_type=question.form_type if use_improved_filters else None,
                 fiscal_year=question.fiscal_year if use_improved_filters else None,
@@ -241,6 +258,12 @@ class EvaluationRunner:
             retrieval_count=response.retrieval_count,
             insufficient_evidence_reason=response.insufficient_evidence_reason,
             latency_ms=_elapsed_ms(started_at),
+            metadata={
+                "answer_mode": response.answer_mode.value,
+                "synthesis_model": response.synthesis_model,
+                "synthesis_status": response.synthesis_status.value,
+                "synthesis_reason": response.synthesis_reason,
+            },
         )
 
 

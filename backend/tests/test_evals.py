@@ -8,7 +8,13 @@ from sec_copilot.answering import Citation
 from sec_copilot.answering.models import QueryType
 from sec_copilot.config import Settings
 from sec_copilot.db.models import Company, Filing, XbrlFact
-from sec_copilot.evals import EvaluationRunner, EvalVariant, format_eval_report, load_eval_questions
+from sec_copilot.evals import (
+    EvaluationRunner,
+    EvalVariant,
+    format_eval_report,
+    load_eval_questions,
+    parse_variants,
+)
 from sec_copilot.evals.openai_baseline import (
     OpenAIEvalClient,
     OpenAIEvalRequest,
@@ -201,6 +207,10 @@ def test_openai_refusal_reason_handles_advice_and_metric_clarification() -> None
         )
         == "no_metric_match"
     )
+
+
+def test_parse_variants_accepts_guarded_llm_synthesis_variant() -> None:
+    assert parse_variants(["improved_rag_xbrl_llm"]) == [EvalVariant.IMPROVED_RAG_XBRL_LLM]
 
 
 def test_evaluation_runner_compares_rag_variants(session: Session) -> None:

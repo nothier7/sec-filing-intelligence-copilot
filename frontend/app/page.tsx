@@ -183,6 +183,9 @@ type NumericGrounding = {
   fiscal_period?: string;
 };
 
+type AnswerMode = "extractive" | "llm";
+type SynthesisStatus = "not_requested" | "succeeded" | "fallback" | "unavailable";
+
 type AskResponse = {
   question: string;
   answer: string;
@@ -193,6 +196,11 @@ type AskResponse = {
   numeric_grounding: NumericGrounding[];
   retrieval_count: number;
   insufficient_evidence_reason?: string;
+  answer_mode: AnswerMode;
+  fallback_answer?: string;
+  synthesis_model?: string;
+  synthesis_status: SynthesisStatus;
+  synthesis_reason?: string;
 };
 
 type CompareCitation = {
@@ -234,6 +242,7 @@ export default function Home() {
   );
   const [sectionType, setSectionType] = useState("all");
   const [question, setQuestion] = useState(sampleQuestions[0].question);
+  const [answerMode, setAnswerMode] = useState<AnswerMode>("llm");
   const [askResponse, setAskResponse] = useState<AskResponse | null>(null);
   const [compareResponse, setCompareResponse] = useState<CompareResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -256,6 +265,7 @@ export default function Home() {
         body: JSON.stringify({
           accession_number: accessionNumber,
           question,
+          answer_mode: answerMode,
           section_type: sectionType === "all" ? undefined : sectionType,
           top_k: 5
         })
@@ -386,6 +396,37 @@ export default function Home() {
                   <option value="legal_proceedings">Legal Proceedings</option>
                 </select>
 
+                <span className="field-label" id="answer-mode-label">
+                  Answer style
+                </span>
+                <div
+                  className="answer-mode-toggle"
+                  role="radiogroup"
+                  aria-labelledby="answer-mode-label"
+                >
+                  <button
+                    className={answerMode === "llm" ? "active" : ""}
+                    type="button"
+                    role="radio"
+                    aria-checked={answerMode === "llm"}
+                    onClick={() => setAnswerMode("llm")}
+                  >
+                    Guarded LLM
+                  </button>
+                  <button
+                    className={answerMode === "extractive" ? "active" : ""}
+                    type="button"
+                    role="radio"
+                    aria-checked={answerMode === "extractive"}
+                    onClick={() => setAnswerMode("extractive")}
+                  >
+                    Extractive
+                  </button>
+                </div>
+                <p className="mode-help">
+                  Guarded LLM uses the cited answer only and falls back when the checks fail.
+                </p>
+
                 <label htmlFor="question">Question</label>
                 <textarea
                   id="question"
@@ -394,7 +435,11 @@ export default function Home() {
                 />
 
                 <button disabled={isLoading || !question.trim()} type="submit">
-                  {isLoading ? "Running retrieval..." : "Ask with citations"}
+                  {isLoading
+                    ? answerMode === "llm"
+                      ? "Checking and polishing..."
+                      : "Running retrieval..."
+                    : "Ask with citations"}
                 </button>
               </form>
             ) : mode === "compare" ? (
@@ -615,9 +660,22 @@ function AskResult({ response }: { response: AskResponse }) {
       <h2>{response.answer}</h2>
       <div className="metric-grid">
         <Metric label="Query type" value={response.query_type} />
+        <Metric label="Answer mode" value={formatAnswerMode(response.answer_mode)} />
+        <Metric label="Synthesis" value={formatSynthesisStatus(response)} />
         <Metric label="Retrieved chunks" value={String(response.retrieval_count)} />
         <Metric label="Citations" value={String(response.citations.length)} />
       </div>
+
+      {response.synthesis_status !== "not_requested" ? (
+        <section
+          className={`synthesis-line ${response.synthesis_status}`}
+          aria-label="LLM synthesis status"
+        >
+          <p className="panel-kicker">Synthesis guard</p>
+          <strong>{formatSynthesisStatus(response)}</strong>
+          <span>{synthesisMessage(response)}</span>
+        </section>
+      ) : null}
 
       {response.numeric_grounding.length ? (
         <section className="fact-line" aria-label="Numeric grounding">
@@ -638,6 +696,33 @@ function AskResult({ response }: { response: AskResponse }) {
       <CitationList citations={response.citations} />
     </div>
   );
+}
+
+function formatAnswerMode(answerMode: AnswerMode) {
+  return answerMode === "llm" ? "Guarded LLM" : "Extractive";
+}
+
+function formatSynthesisStatus(response: AskResponse) {
+  if (response.synthesis_status === "succeeded") {
+    return response.synthesis_model ? `Succeeded · ${response.synthesis_model}` : "Succeeded";
+  }
+  if (response.synthesis_status === "unavailable") {
+    return "Unavailable";
+  }
+  if (response.synthesis_status === "fallback") {
+    return "Fallback";
+  }
+  return "Not requested";
+}
+
+function synthesisMessage(response: AskResponse) {
+  if (response.synthesis_status === "succeeded") {
+    return "The polished answer passed citation, refusal, and numeric grounding checks.";
+  }
+  if (response.synthesis_status === "unavailable") {
+    return `Using the deterministic cited answer: ${response.synthesis_reason ?? "not available"}.`;
+  }
+  return `Using the deterministic cited answer: ${response.synthesis_reason ?? "guard check"}.`;
 }
 
 function CompareResult({ response }: { response: CompareResponse }) {

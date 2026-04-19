@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     openai_eval_web_search_max_tool_calls: int = 3
     openai_eval_cache_dir: str = "evals/results/cache/openai"
     openai_eval_context_chars: int = 3500
+    openai_synthesis_model: str = "gpt-5-mini"
+    openai_synthesis_max_output_tokens: int = 600
+    openai_synthesis_reasoning_effort: str = "minimal"
+    openai_synthesis_timeout_seconds: float = 60.0
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -20,10 +20,23 @@ class NumericGroundingStatus(str, Enum):
     UNAVAILABLE = "unavailable"
 
 
+class AnswerMode(str, Enum):
+    EXTRACTIVE = "extractive"
+    LLM = "llm"
+
+
+class SynthesisStatus(str, Enum):
+    NOT_REQUESTED = "not_requested"
+    SUCCEEDED = "succeeded"
+    FALLBACK = "fallback"
+    UNAVAILABLE = "unavailable"
+
+
 class AskRequest(BaseModel):
     question: str = Field(min_length=1)
     accession_number: str = Field(min_length=1)
     top_k: int = Field(default=5, ge=1, le=20)
+    answer_mode: AnswerMode = AnswerMode.EXTRACTIVE
     cik: Optional[str] = None
     form_type: Optional[str] = None
     fiscal_year: Optional[int] = None
@@ -71,3 +84,8 @@ class AskResponse(BaseModel):
     numeric_grounding: list[NumericGrounding] = Field(default_factory=list)
     retrieval_count: int = 0
     insufficient_evidence_reason: Optional[str] = None
+    answer_mode: AnswerMode = AnswerMode.EXTRACTIVE
+    fallback_answer: Optional[str] = None
+    synthesis_model: Optional[str] = None
+    synthesis_status: SynthesisStatus = SynthesisStatus.NOT_REQUESTED
+    synthesis_reason: Optional[str] = None

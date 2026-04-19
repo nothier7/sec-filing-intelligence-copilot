@@ -7,6 +7,7 @@ and OpenAI baseline variants:
 - `naive_rag`: retrieval over the whole filing without metadata filters.
 - `improved_rag`: retrieval with section and metadata filters.
 - `improved_rag_xbrl`: metadata-aware retrieval plus structured XBRL fact grounding.
+- `improved_rag_xbrl_llm`: guarded LLM synthesis over the XBRL-grounded answer.
 - `openai_closed_book`: configured OpenAI model without filing excerpts.
 - `openai_retrieved_context`: configured OpenAI model with retrieved filing excerpts,
   but without XBRL fact grounding.
@@ -93,6 +94,7 @@ PYTHONPATH=backend/src DATABASE_URL=sqlite:///data/sec_copilot_real.db \
   --variant naive_rag \
   --variant improved_rag \
   --variant improved_rag_xbrl \
+  --variant improved_rag_xbrl_llm \
   --variant openai_closed_book \
   --variant openai_retrieved_context \
   --variant openai_web_search \
@@ -110,6 +112,12 @@ By default, OpenAI eval baselines use `gpt-5-mini`. Override it with
 with `OPENAI_EVAL_REASONING_EFFORT=minimal` and
 `OPENAI_EVAL_MAX_OUTPUT_TOKENS=800` by default so reasoning tokens do not crowd
 out short benchmark answers.
+
+The `improved_rag_xbrl_llm` variant uses the same `OPENAI_API_KEY` with
+`OPENAI_SYNTHESIS_MODEL`, `OPENAI_SYNTHESIS_MAX_OUTPUT_TOKENS`,
+`OPENAI_SYNTHESIS_REASONING_EFFORT`, and `OPENAI_SYNTHESIS_TIMEOUT_SECONDS`.
+If no key is configured, the variant returns the deterministic XBRL-grounded
+answer and records `missing_openai_api_key` as synthesis metadata.
 
 The `openai_web_search` variant uses `OPENAI_EVAL_WEB_SEARCH_REASONING_EFFORT=low`
 because GPT-5 web search does not support minimal reasoning. It also supports

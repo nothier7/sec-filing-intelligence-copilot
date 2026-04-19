@@ -185,6 +185,11 @@ RAG plus XBRL grounding. It writes JSON metrics and a Markdown report under
 `evals/results/`, including an ablation table, retrieval/evidence recall,
 numeric accuracy, refusal accuracy, latency, and failure examples.
 
+To evaluate the guarded LLM synthesis layer, pass `--variant improved_rag_xbrl_llm`.
+That variant rewrites only already-supported XBRL-grounded answers and falls back
+to the deterministic cited answer when the OpenAI key is missing or validation
+fails.
+
 The checked-in seed set is intentionally small and fixture-aligned so the harness
 can be tested offline. For live portfolio demos, create or extend JSONL benchmark
 rows that point at filings you ingested locally, then run:

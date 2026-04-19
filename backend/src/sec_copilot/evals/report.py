@@ -41,6 +41,7 @@ def format_eval_report(result: EvalRunResult) -> str:
             "- `naive_rag` retrieves over the full filing without section metadata filters or XBRL grounding.",
             "- `improved_rag` applies the eval question's metadata filters but keeps numeric answers text-only.",
             "- `improved_rag_xbrl` adds structured SEC fact lookup for numeric questions.",
+            "- `improved_rag_xbrl_llm` adds guarded LLM synthesis on top of the XBRL-grounded answer.",
             "- `openai_closed_book` asks the configured OpenAI model without filing excerpts.",
             "- `openai_retrieved_context` asks the configured OpenAI model with retrieved filing excerpts, but without XBRL grounding.",
             "- `openai_web_search` asks the configured OpenAI model with web search enabled, but without local-corpus controls or XBRL grounding.",

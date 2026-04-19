@@ -6,13 +6,16 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from sec_copilot.answering.classifier import classify_query
+from sec_copilot.answering.llm_synthesis import LlmSynthesisService
 from sec_copilot.answering.models import (
+    AnswerMode,
     AskRequest,
     AskResponse,
     Citation,
     NumericGrounding,
     NumericGroundingStatus,
     QueryType,
+    SynthesisStatus,
 )
 from sec_copilot.answering.synthesis import (
     best_evidence_snippet,
@@ -37,24 +40,29 @@ class CitedAnswerService:
         embed_model: Optional[HashEmbedding] = None,
         min_similarity_score: float = 0.05,
         enable_numeric_grounding: bool = True,
+        llm_synthesis: Optional[LlmSynthesisService] = None,
     ) -> None:
         self.retrieval = RetrievalIndexService(session=session, embed_model=embed_model)
         self.fact_lookup = FactLookupService(session=session)
         self.min_similarity_score = min_similarity_score
         self.enable_numeric_grounding = enable_numeric_grounding
+        self.llm_synthesis = llm_synthesis or LlmSynthesisService()
 
     def answer(self, request: AskRequest) -> AskResponse:
         query_type = classify_query(request.question)
         if query_type == QueryType.UNSUPPORTED:
-            return AskResponse(
-                question=request.question,
-                answer=unsupported_answer(),
-                query_type=query_type,
-                supported=False,
-                confidence=0.0,
-                citations=[],
-                retrieval_count=0,
-                insufficient_evidence_reason="unsupported_query_type",
+            return self._with_requested_answer_mode(
+                request,
+                AskResponse(
+                    question=request.question,
+                    answer=unsupported_answer(),
+                    query_type=query_type,
+                    supported=False,
+                    confidence=0.0,
+                    citations=[],
+                    retrieval_count=0,
+                    insufficient_evidence_reason="unsupported_query_type",
+                ),
             )
 
         filing = self.retrieval.filings.get_by_accession_number(request.accession_number)
@@ -89,7 +97,11 @@ class CitedAnswerService:
         strong_results = self._strong_results(results)
         citation_query = self._citation_query(request.question, fact_lookup)
         citations = [self._citation_for_result(citation_query, result) for result in strong_results]
-        if query_type == QueryType.NUMERIC and fact_lookup is not None and fact_lookup.fact is not None:
+        if (
+            query_type == QueryType.NUMERIC
+            and fact_lookup is not None
+            and fact_lookup.fact is not None
+        ):
             citations = self._prioritize_fact_citations(citations, fact_lookup.fact)
         snippets = [citation.snippet for citation in citations]
         numeric_grounding = self._numeric_grounding(fact_lookup, snippets)
@@ -101,54 +113,103 @@ class CitedAnswerService:
             numeric_grounding=numeric_grounding,
         )
         if insufficient_reason is not None:
-            return AskResponse(
-                question=request.question,
-                answer=(
-                    metric_clarification_answer()
-                    if insufficient_reason == "no_metric_match"
-                    else insufficient_evidence_answer()
+            return self._with_requested_answer_mode(
+                request,
+                AskResponse(
+                    question=request.question,
+                    answer=(
+                        metric_clarification_answer()
+                        if insufficient_reason == "no_metric_match"
+                        else insufficient_evidence_answer()
+                    ),
+                    query_type=query_type,
+                    supported=False,
+                    confidence=0.0,
+                    citations=citations,
+                    numeric_grounding=numeric_grounding,
+                    retrieval_count=len(results),
+                    insufficient_evidence_reason=insufficient_reason,
                 ),
-                query_type=query_type,
-                supported=False,
-                confidence=0.0,
-                citations=citations,
-                numeric_grounding=numeric_grounding,
-                retrieval_count=len(results),
-                insufficient_evidence_reason=insufficient_reason,
             )
 
         if query_type == QueryType.NUMERIC and fact_lookup is not None and fact_lookup.fact:
             fact = fact_lookup.fact
             value = format_fact_value(fact.value)
-            return AskResponse(
-                question=request.question,
-                answer=synthesize_numeric_fact_answer(
-                    metric_label=fact_lookup.metric.label if fact_lookup.metric else fact.concept,
-                    value=value,
-                    unit=fact.unit,
-                    period=self._period_label(fact),
-                    concept=fact.concept,
+            return self._with_requested_answer_mode(
+                request,
+                AskResponse(
+                    question=request.question,
+                    answer=synthesize_numeric_fact_answer(
+                        metric_label=(
+                            fact_lookup.metric.label if fact_lookup.metric else fact.concept
+                        ),
+                        value=value,
+                        unit=fact.unit,
+                        period=self._period_label(fact),
+                        concept=fact.concept,
+                    ),
+                    query_type=query_type,
+                    supported=True,
+                    confidence=1.0,
+                    citations=citations,
+                    numeric_grounding=numeric_grounding,
+                    retrieval_count=len(results),
+                    insufficient_evidence_reason=None,
                 ),
+            )
+
+        confidence = min(max((result.score or 0.0) for result in strong_results), 1.0)
+        return self._with_requested_answer_mode(
+            request,
+            AskResponse(
+                question=request.question,
+                answer=synthesize_extractive_answer(request.question, snippets),
                 query_type=query_type,
                 supported=True,
-                confidence=1.0,
+                confidence=confidence,
                 citations=citations,
                 numeric_grounding=numeric_grounding,
                 retrieval_count=len(results),
                 insufficient_evidence_reason=None,
+            ),
+        )
+
+    def _with_requested_answer_mode(
+        self,
+        request: AskRequest,
+        response: AskResponse,
+    ) -> AskResponse:
+        if request.answer_mode == AnswerMode.EXTRACTIVE:
+            return response.model_copy(
+                update={
+                    "answer_mode": AnswerMode.EXTRACTIVE,
+                    "fallback_answer": None,
+                    "synthesis_model": None,
+                    "synthesis_status": SynthesisStatus.NOT_REQUESTED,
+                    "synthesis_reason": None,
+                }
             )
 
-        confidence = min(max((result.score or 0.0) for result in strong_results), 1.0)
-        return AskResponse(
-            question=request.question,
-            answer=synthesize_extractive_answer(request.question, snippets),
-            query_type=query_type,
-            supported=True,
-            confidence=confidence,
-            citations=citations,
-            numeric_grounding=numeric_grounding,
-            retrieval_count=len(results),
-            insufficient_evidence_reason=None,
+        result = self.llm_synthesis.synthesize(response)
+        if result.status == SynthesisStatus.SUCCEEDED and result.answer:
+            return response.model_copy(
+                update={
+                    "answer": result.answer,
+                    "answer_mode": AnswerMode.LLM,
+                    "fallback_answer": response.answer,
+                    "synthesis_model": result.model,
+                    "synthesis_status": result.status,
+                    "synthesis_reason": result.reason,
+                }
+            )
+        return response.model_copy(
+            update={
+                "answer_mode": AnswerMode.EXTRACTIVE,
+                "fallback_answer": response.answer,
+                "synthesis_model": result.model,
+                "synthesis_status": result.status,
+                "synthesis_reason": result.reason,
+            }
         )
 
     def _strong_results(self, results: list[RetrievalResult]) -> list[RetrievalResult]:

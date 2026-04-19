@@ -6,7 +6,21 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from sec_copilot.answering import AskRequest, Citation, CitedAnswerService, QueryType, classify_query
+from sec_copilot.answering import (
+    AnswerMode,
+    AskRequest,
+    AskResponse,
+    Citation,
+    CitedAnswerService,
+    LlmSynthesisResult,
+    LlmSynthesisService,
+    NumericGrounding,
+    NumericGroundingStatus,
+    QueryType,
+    SynthesisStatus,
+    classify_query,
+)
+from sec_copilot.config import Settings
 from sec_copilot.db.models import Chunk, Company, Filing, XbrlFact
 from sec_copilot.filings import FilingParseService
 from sec_copilot.main import app, get_db_session
@@ -44,6 +58,8 @@ def test_cited_answer_service_returns_supported_answer_with_citations(session: S
 
     assert response.supported is True
     assert response.query_type == QueryType.TEXT
+    assert response.answer_mode == AnswerMode.EXTRACTIVE
+    assert response.synthesis_status == SynthesisStatus.NOT_REQUESTED
     assert response.citations
     assert response.citations[0].chunk_id == "0000320193-24-000123:s0002:c0001"
     assert response.citations[0].section_type == "risk_factors"
@@ -99,6 +115,115 @@ def test_cited_answer_service_uses_structured_xbrl_fact_for_numeric_answer(
     assert response.numeric_grounding[0].metric == "revenue"
     assert response.numeric_grounding[0].concept == "RevenueFromContractWithCustomerExcludingAssessedTax"
     assert response.numeric_grounding[0].value == "383,285,000,000"
+
+
+def test_cited_answer_service_uses_guarded_llm_synthesis_when_requested(
+    session: Session,
+) -> None:
+    filing_id = _create_parsed_fixture_filing(session)
+    _add_revenue_fact(session, filing_id)
+    fake_synthesis = _FakeLlmSynthesis(
+        LlmSynthesisResult(
+            status=SynthesisStatus.SUCCEEDED,
+            answer="Apple reported 383,285,000,000 USD in revenue for FY 2024.",
+            model="fake-synthesis-model",
+        )
+    )
+
+    response = CitedAnswerService(
+        session=session,
+        embed_model=HashEmbedding(dimensions=32),
+        llm_synthesis=fake_synthesis,  # type: ignore[arg-type]
+    ).answer(
+        AskRequest(
+            accession_number="0000320193-24-000123",
+            question="How much revenue did Apple report in 2024?",
+            answer_mode=AnswerMode.LLM,
+            top_k=2,
+        )
+    )
+
+    assert response.answer_mode == AnswerMode.LLM
+    assert response.synthesis_status == SynthesisStatus.SUCCEEDED
+    assert response.synthesis_model == "fake-synthesis-model"
+    assert response.answer == "Apple reported 383,285,000,000 USD in revenue for FY 2024."
+    assert response.fallback_answer is not None
+    assert "383,285,000,000 USD" in response.fallback_answer
+    assert len(fake_synthesis.responses) == 1
+
+
+def test_cited_answer_service_falls_back_when_llm_synthesis_unavailable(
+    session: Session,
+) -> None:
+    filing_id = _create_parsed_fixture_filing(session)
+    _add_revenue_fact(session, filing_id)
+    fake_synthesis = _FakeLlmSynthesis(
+        LlmSynthesisResult(
+            status=SynthesisStatus.UNAVAILABLE,
+            reason="missing_openai_api_key",
+        )
+    )
+
+    response = CitedAnswerService(
+        session=session,
+        embed_model=HashEmbedding(dimensions=32),
+        llm_synthesis=fake_synthesis,  # type: ignore[arg-type]
+    ).answer(
+        AskRequest(
+            accession_number="0000320193-24-000123",
+            question="How much revenue did Apple report in 2024?",
+            answer_mode=AnswerMode.LLM,
+            top_k=2,
+        )
+    )
+
+    assert response.answer_mode == AnswerMode.EXTRACTIVE
+    assert response.synthesis_status == SynthesisStatus.UNAVAILABLE
+    assert response.synthesis_reason == "missing_openai_api_key"
+    assert response.fallback_answer == response.answer
+    assert "383,285,000,000 USD" in response.answer
+
+
+def test_llm_synthesis_service_returns_unavailable_without_api_key() -> None:
+    service = LlmSynthesisService(settings=Settings(openai_api_key=None))
+
+    result = service.synthesize(_supported_numeric_response())
+
+    assert result.status == SynthesisStatus.UNAVAILABLE
+    assert result.reason == "missing_openai_api_key"
+
+
+def test_llm_synthesis_validation_rejects_unsafe_or_ungrounded_rewrites() -> None:
+    service = LlmSynthesisService(settings=Settings(openai_api_key=None))
+    response = _supported_numeric_response()
+
+    assert (
+        service._validate_answer(
+            "Apple reported 383,285,000,000 USD in revenue for FY 2024.",
+            response,
+        )
+        is None
+    )
+    assert (
+        service._validate_answer("Apple reported $383.285 billion in fiscal 2024.", response)
+        == "numeric_value_changed_or_omitted"
+    )
+    assert (
+        service._validate_answer(
+            "Apple reported 383,285,000,000 USD in revenue for FY 2024. "
+            "You should buy the stock.",
+            response,
+        )
+        == "investment_advice_language"
+    )
+    assert (
+        service._validate_answer(
+            "Apple reported 383,285,000,000 USD in revenue for FY 2024. "
+            "See https://example.com.",
+            response,
+        )
+        == "unknown_citation_reference"
+    )
 
 
 def test_cited_answer_service_asks_for_specific_spending_metric(session: Session) -> None:
@@ -424,6 +549,8 @@ def test_ask_endpoint_serializes_citations(session: Session) -> None:
     payload = response.json()
     assert payload["supported"] is True
     assert payload["query_type"] == "text"
+    assert payload["answer_mode"] == "extractive"
+    assert payload["synthesis_status"] == "not_requested"
     assert payload["numeric_grounding"] == []
     assert payload["citations"][0]["chunk_id"] == "0000320193-24-000123:s0002:c0001"
     assert payload["citations"][0]["source_url"] == "https://www.sec.gov/Archives/example.htm"
@@ -447,6 +574,52 @@ def test_ask_endpoint_returns_404_for_missing_filing(session: Session) -> None:
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Filing not found: missing-filing"
+
+
+class _FakeLlmSynthesis:
+    def __init__(self, result: LlmSynthesisResult) -> None:
+        self.result = result
+        self.responses: list[AskResponse] = []
+
+    def synthesize(self, response: AskResponse) -> LlmSynthesisResult:
+        self.responses.append(response)
+        return self.result
+
+
+def _supported_numeric_response() -> AskResponse:
+    return AskResponse(
+        question="How much revenue did Apple report in 2024?",
+        answer=(
+            "Revenue was 383,285,000,000 USD for FY 2024 "
+            "(RevenueFromContractWithCustomerExcludingAssessedTax)."
+        ),
+        query_type=QueryType.NUMERIC,
+        supported=True,
+        confidence=1.0,
+        citations=[
+            Citation(
+                chunk_id="0000320193-24-000123:s0001:c0001",
+                accession_number="0000320193-24-000123",
+                section_name="Item 7. MD&A",
+                section_type="mda",
+                source_url="https://www.sec.gov/Archives/example.htm",
+                snippet="Total net sales were 383,285,000,000 USD in fiscal year 2024.",
+            )
+        ],
+        numeric_grounding=[
+            NumericGrounding(
+                status=NumericGroundingStatus.VALIDATED,
+                metric="revenue",
+                metric_label="Revenue",
+                concept="RevenueFromContractWithCustomerExcludingAssessedTax",
+                value="383,285,000,000",
+                unit="USD",
+                fiscal_year=2024,
+                fiscal_period="FY",
+            )
+        ],
+        retrieval_count=1,
+    )
 
 
 def _create_parsed_fixture_filing(session: Session) -> int:
