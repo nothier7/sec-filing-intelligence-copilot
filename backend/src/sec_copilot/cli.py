@@ -90,8 +90,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--variant",
         dest="variants",
         action="append",
-        choices=["closed_book", "naive_rag", "improved_rag", "improved_rag_xbrl"],
+        choices=[
+            "closed_book",
+            "naive_rag",
+            "improved_rag",
+            "improved_rag_xbrl",
+            "openai_closed_book",
+            "openai_retrieved_context",
+        ],
         help="Variant to run. Repeat to run multiple variants. Defaults to all variants.",
+    )
+    run_eval.add_argument(
+        "--openai-model",
+        help="Optional OpenAI model override for OpenAI eval variants.",
+    )
+    run_eval.add_argument(
+        "--refresh-openai-cache",
+        action="store_true",
+        help="Refresh cached OpenAI eval predictions instead of reusing local cache files.",
     )
     run_eval.add_argument(
         "--output",
@@ -202,7 +218,11 @@ def main() -> None:
 
         variants = parse_variants(args.variants)
         with session_scope() as session:
-            result = EvaluationRunner(session=session).run(
+            result = EvaluationRunner(
+                session=session,
+                openai_model=args.openai_model,
+                refresh_openai_cache=args.refresh_openai_cache,
+            ).run(
                 dataset_path=args.dataset,
                 variants=variants,
             )

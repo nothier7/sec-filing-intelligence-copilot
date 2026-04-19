@@ -7,9 +7,14 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from sec_copilot.answering import AskRequest, CitedAnswerService, classify_query
+from sec_copilot.answering import AskRequest, Citation, CitedAnswerService, classify_query
 from sec_copilot.answering.models import QueryType
-from sec_copilot.answering.synthesis import insufficient_evidence_answer, unsupported_answer
+from sec_copilot.answering.synthesis import (
+    best_evidence_snippet,
+    insufficient_evidence_answer,
+    unsupported_answer,
+)
+from sec_copilot.config import get_settings
 from sec_copilot.evals.dataset import load_eval_questions
 from sec_copilot.evals.metrics import aggregate_metrics, score_prediction
 from sec_copilot.evals.models import (
@@ -19,7 +24,17 @@ from sec_copilot.evals.models import (
     EvalRunResult,
     EvalVariant,
 )
-from sec_copilot.retrieval import HashEmbedding
+from sec_copilot.evals.openai_baseline import (
+    OpenAIContextExcerpt,
+    OpenAIEvalClient,
+    OpenAIEvalRequest,
+)
+from sec_copilot.retrieval import (
+    HashEmbedding,
+    RetrievalFilters,
+    RetrievalIndexService,
+    RetrievalResult,
+)
 
 
 DEFAULT_VARIANTS = [
@@ -35,9 +50,16 @@ class EvaluationRunner:
         self,
         session: Session,
         embed_model: Optional[HashEmbedding] = None,
+        openai_model: Optional[str] = None,
+        refresh_openai_cache: bool = False,
     ) -> None:
         self.session = session
         self.embed_model = embed_model
+        self.openai_client = OpenAIEvalClient(
+            settings=get_settings(),
+            model=openai_model,
+            refresh_cache=refresh_openai_cache,
+        )
 
     def run(
         self,
@@ -86,6 +108,12 @@ class EvaluationRunner:
         try:
             if variant == EvalVariant.CLOSED_BOOK:
                 return self._closed_book_prediction(question, started_at)
+            if variant == EvalVariant.OPENAI_CLOSED_BOOK:
+                return self.openai_client.predict(
+                    OpenAIEvalRequest(question=question, variant=variant)
+                )
+            if variant == EvalVariant.OPENAI_RETRIEVED_CONTEXT:
+                return self._openai_retrieved_context_prediction(question, variant)
             return self._rag_prediction(question, variant, started_at)
         except Exception as exc:  # noqa: BLE001 - eval runs should capture failures per example.
             return EvalPrediction(
@@ -97,6 +125,62 @@ class EvaluationRunner:
                 error=str(exc),
                 insufficient_evidence_reason="eval_variant_error",
             )
+
+    def _openai_retrieved_context_prediction(
+        self,
+        question: EvalQuestion,
+        variant: EvalVariant,
+    ) -> EvalPrediction:
+        retrieval = RetrievalIndexService(session=self.session, embed_model=self.embed_model)
+        filing = retrieval.filings.get_by_accession_number(question.accession_number)
+        if filing is None:
+            raise ValueError(f"Filing not found: {question.accession_number}")
+        results = retrieval.retrieve_for_filing(
+            filing_id=filing.id,
+            query=question.question,
+            top_k=question.top_k,
+            filters=RetrievalFilters(
+                accession_number=question.accession_number,
+                cik=question.cik,
+                form_type=question.form_type,
+                fiscal_year=question.fiscal_year,
+                fiscal_quarter=question.fiscal_quarter,
+                section_type=question.section_type,
+            ),
+        )
+        context_excerpts = tuple(
+            OpenAIContextExcerpt(
+                citation=self._citation_for_openai_context(question, result),
+                text=result.text,
+            )
+            for result in results
+        )
+        return self.openai_client.predict(
+            OpenAIEvalRequest(
+                question=question,
+                variant=variant,
+                context_excerpts=context_excerpts,
+            )
+        )
+
+    def _citation_for_openai_context(
+        self,
+        question: EvalQuestion,
+        result: RetrievalResult,
+    ) -> Citation:
+        metadata = result.metadata
+
+        return Citation(
+            chunk_id=result.chunk_id,
+            accession_number=metadata.get("accession_number"),
+            section_name=metadata.get("section_name"),
+            section_type=metadata.get("section_type"),
+            source_url=metadata.get("source_url"),
+            source_start=metadata.get("source_start"),
+            source_end=metadata.get("source_end"),
+            score=result.score,
+            snippet=best_evidence_snippet(question.question, result),
+        )
 
     def _closed_book_prediction(
         self,

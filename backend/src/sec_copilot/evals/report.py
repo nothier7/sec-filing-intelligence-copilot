@@ -15,8 +15,8 @@ def format_eval_report(result: EvalRunResult) -> str:
         "",
         "## Headline Metrics",
         "",
-        "| Variant | Accuracy | Numeric Accuracy | Refusal Accuracy | Evidence Recall | Avg Latency (ms) | Error Rate |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Variant | Accuracy | Numeric Accuracy | Grounded Numeric Accuracy | Refusal Accuracy | Evidence Recall | Avg Latency (ms) | Error Rate |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for variant in result.variants:
         metrics = result.metrics.get(variant, {})
@@ -25,6 +25,7 @@ def format_eval_report(result: EvalRunResult) -> str:
             f"{_variant_label(variant)} | "
             f"{_percent(metrics.get('accuracy'))} | "
             f"{_percent(metrics.get('numeric_accuracy'))} | "
+            f"{_percent(metrics.get('numeric_grounding_accuracy'))} | "
             f"{_percent(metrics.get('refusal_accuracy'))} | "
             f"{_percent(metrics.get('evidence_recall'))} | "
             f"{_number(metrics.get('avg_latency_ms'))} | "
@@ -40,6 +41,8 @@ def format_eval_report(result: EvalRunResult) -> str:
             "- `naive_rag` retrieves over the full filing without section metadata filters or XBRL grounding.",
             "- `improved_rag` applies the eval question's metadata filters but keeps numeric answers text-only.",
             "- `improved_rag_xbrl` adds structured SEC fact lookup for numeric questions.",
+            "- `openai_closed_book` asks the configured OpenAI model without filing excerpts.",
+            "- `openai_retrieved_context` asks the configured OpenAI model with retrieved filing excerpts, but without XBRL grounding.",
             "",
             "## Failure Examples",
             "",

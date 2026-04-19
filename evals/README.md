@@ -6,6 +6,9 @@ The benchmark runner compares SEC Copilot answer quality across four variants:
 - `naive_rag`: retrieval over the whole filing without metadata filters.
 - `improved_rag`: retrieval with section and metadata filters.
 - `improved_rag_xbrl`: metadata-aware retrieval plus structured XBRL fact grounding.
+- `openai_closed_book`: configured OpenAI model without filing excerpts.
+- `openai_retrieved_context`: configured OpenAI model with retrieved filing excerpts,
+  but without XBRL fact grounding.
 
 Run the default benchmark:
 
@@ -40,7 +43,31 @@ PYTHONPATH=backend/src DATABASE_URL=sqlite:///data/sec_copilot_real.db \
 
 The current tracked benchmark report is `reports/aapl_real_eval.md`. In the latest
 local run, `improved_rag_xbrl` reached 100% accuracy, 100% numeric accuracy, 100%
-refusal accuracy, and 100% evidence recall across 24 real SEC questions.
+grounded numeric accuracy, 100% refusal accuracy, and 100% evidence recall across
+24 real SEC questions. `openai_retrieved_context` reached 79.2% accuracy and 83.3%
+numeric accuracy, but 0% grounded numeric accuracy because it does not validate
+answers against structured XBRL facts.
+
+To include OpenAI baselines, add `OPENAI_API_KEY` to your local `.env` and pass the
+OpenAI variants explicitly:
+
+```bash
+PYTHONPATH=backend/src DATABASE_URL=sqlite:///data/sec_copilot_real.db \
+  .venv/bin/python -m sec_copilot.cli run-eval \
+  --dataset evals/questions/aapl_real_2025_2026.jsonl \
+  --variant closed_book \
+  --variant naive_rag \
+  --variant improved_rag \
+  --variant improved_rag_xbrl \
+  --variant openai_closed_book \
+  --variant openai_retrieved_context \
+  --output evals/results/aapl_real_openai_eval.json \
+  --report evals/results/aapl_real_openai_eval.md
+```
+
+OpenAI predictions are cached under `OPENAI_EVAL_CACHE_DIR`, which defaults to
+`evals/results/cache/openai`. Use `--refresh-openai-cache` when you intentionally
+want to spend API calls again.
 
 ## JSONL Schema
 

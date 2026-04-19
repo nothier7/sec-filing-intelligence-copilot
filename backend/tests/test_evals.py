@@ -4,8 +4,11 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from sec_copilot.answering import Citation
 from sec_copilot.db.models import Company, Filing, XbrlFact
 from sec_copilot.evals import EvaluationRunner, EvalVariant, format_eval_report, load_eval_questions
+from sec_copilot.evals.metrics import score_prediction
+from sec_copilot.evals.models import EvalExpected, EvalPrediction, EvalQuestion
 from sec_copilot.filings import FilingParseService
 from sec_copilot.repositories import CompanyRepository, FilingRepository, XbrlFactRepository
 from sec_copilot.retrieval import HashEmbedding
@@ -20,6 +23,38 @@ def test_load_eval_questions_from_jsonl() -> None:
     assert len(questions) == 4
     assert questions[0].id == "sec_seed_text_risk_001"
     assert questions[0].expected.citation_chunk_ids == ["0000320193-24-000123:s0002:c0001"]
+
+
+def test_numeric_value_scoring_handles_external_llm_answer_without_grounding() -> None:
+    question = EvalQuestion(
+        id="numeric",
+        question="How much revenue did Apple report?",
+        accession_number="0000320193-24-000123",
+        expected=EvalExpected(
+            xbrl_concepts=["RevenueFromContractWithCustomerExcludingAssessedTax"],
+            numeric_value="383,285,000,000",
+            numeric_unit="USD",
+        ),
+    )
+    prediction = EvalPrediction(
+        question_id=question.id,
+        variant=EvalVariant.OPENAI_RETRIEVED_CONTEXT,
+        supported=True,
+        answer="Apple reported revenue of $383.285 billion.",
+        citations=[
+            Citation(
+                chunk_id="chunk",
+                snippet="Total net sales $ 383,285",
+            )
+        ],
+        latency_ms=1.0,
+    )
+
+    score = score_prediction(question, prediction)
+
+    assert score["numeric_match"] == 1.0
+    assert score["numeric_grounding_match"] == 0.0
+    assert score["answer_correct"] == 1.0
 
 
 def test_evaluation_runner_compares_rag_variants(session: Session) -> None:
@@ -43,8 +78,9 @@ def test_evaluation_runner_compares_rag_variants(session: Session) -> None:
         EvalVariant.IMPROVED_RAG_XBRL
     ]["accuracy"]
     assert result.metrics[EvalVariant.CLOSED_BOOK]["refusal_accuracy"] == 1.0
-    assert result.metrics[EvalVariant.IMPROVED_RAG]["numeric_accuracy"] == 0.0
+    assert result.metrics[EvalVariant.IMPROVED_RAG]["numeric_grounding_accuracy"] == 0.0
     assert result.metrics[EvalVariant.IMPROVED_RAG_XBRL]["numeric_accuracy"] == 1.0
+    assert result.metrics[EvalVariant.IMPROVED_RAG_XBRL]["numeric_grounding_accuracy"] == 1.0
     assert "improved_rag_xbrl" in result.model_dump_json()
 
 
@@ -63,7 +99,7 @@ def test_eval_report_includes_ablation_table(session: Session) -> None:
 
     assert "## Headline Metrics" in report
     assert "improved rag xbrl" in report
-    assert "| Variant | Accuracy | Numeric Accuracy |" in report
+    assert "| Variant | Accuracy | Numeric Accuracy | Grounded Numeric Accuracy |" in report
 
 
 def _create_parsed_fixture_filing(session: Session) -> int:

@@ -14,6 +14,8 @@ class EvalVariant(str, Enum):
     NAIVE_RAG = "naive_rag"
     IMPROVED_RAG = "improved_rag"
     IMPROVED_RAG_XBRL = "improved_rag_xbrl"
+    OPENAI_CLOSED_BOOK = "openai_closed_book"
+    OPENAI_RETRIEVED_CONTEXT = "openai_retrieved_context"
 
 
 class EvalExpected(BaseModel):
@@ -53,6 +55,7 @@ class EvalPrediction(BaseModel):
     insufficient_evidence_reason: Optional[str] = None
     latency_ms: float = Field(ge=0.0)
     error: Optional[str] = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class EvalQuestionResult(BaseModel):

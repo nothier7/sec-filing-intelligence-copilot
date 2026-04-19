@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -12,6 +13,12 @@ class Settings(BaseSettings):
     sec_user_agent: str = "SEC Filing Intelligence Copilot contact@example.com"
     sec_requests_per_second: int = 5
     sec_raw_data_dir: str = "data/raw/sec"
+    openai_api_key: Optional[str] = None
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_eval_model: str = "gpt-4.1-mini"
+    openai_eval_max_output_tokens: int = 250
+    openai_eval_cache_dir: str = "evals/results/cache/openai"
+    openai_eval_context_chars: int = 3500
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

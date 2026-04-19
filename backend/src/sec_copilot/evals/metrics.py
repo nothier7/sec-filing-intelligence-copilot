@@ -21,6 +21,7 @@ def score_prediction(question: EvalQuestion, prediction: EvalPrediction) -> dict
         ],
     )
     numeric_match = _numeric_match(question, prediction)
+    numeric_grounding_match = _numeric_grounding_match(question, prediction)
     supported_match = float(prediction.supported == expected.supported)
     refusal_match = _refusal_match(question, prediction)
 
@@ -38,6 +39,7 @@ def score_prediction(question: EvalQuestion, prediction: EvalPrediction) -> dict
         "section_recall": section_recall,
         "evidence_recall": citation_recall if expected.citation_chunk_ids else section_recall,
         "numeric_match": numeric_match,
+        "numeric_grounding_match": numeric_grounding_match,
         "refusal_match": refusal_match,
         "latency_ms": prediction.latency_ms,
         "error": float(prediction.error is not None),
@@ -63,6 +65,14 @@ def aggregate_metrics(scores: Iterable[dict[str, float]]) -> dict[str, float]:
     ]
     if numeric_scores:
         metrics["numeric_accuracy"] = _mean(numeric_scores)
+
+    grounded_numeric_scores = [
+        score["numeric_grounding_match"]
+        for score in score_list
+        if score["numeric_grounding_match"] >= 0.0
+    ]
+    if grounded_numeric_scores:
+        metrics["numeric_grounding_accuracy"] = _mean(grounded_numeric_scores)
 
     refusal_scores = [
         score["refusal_match"] for score in score_list if score["refusal_match"] >= 0.0
@@ -102,6 +112,20 @@ def _keyword_match(expected_keywords: list[str], context: str) -> float:
 
 
 def _numeric_match(question: EvalQuestion, prediction: EvalPrediction) -> float:
+    expected = question.expected
+    if expected.numeric_value is None and not expected.xbrl_concepts:
+        return -1.0
+    if _numeric_grounding_match(question, prediction) == 1.0:
+        return 1.0
+    if expected.numeric_value is None:
+        return 0.0
+
+    expected_tokens = _expected_numeric_tokens(expected.numeric_value)
+    observed_tokens = _observed_numeric_tokens(_answer_context(prediction))
+    return float(bool(expected_tokens & observed_tokens))
+
+
+def _numeric_grounding_match(question: EvalQuestion, prediction: EvalPrediction) -> float:
     expected = question.expected
     if expected.numeric_value is None and not expected.xbrl_concepts:
         return -1.0
@@ -145,6 +169,28 @@ def _answer_context(prediction: EvalPrediction) -> str:
 
 def _digits(value: str) -> str:
     return "".join(character for character in value if character.isdigit())
+
+
+def _expected_numeric_tokens(value: str) -> set[str]:
+    digits = _digits(value)
+    if not digits:
+        return set()
+    tokens = {digits}
+    integer_value = int(digits)
+    for divisor in (1_000, 1_000_000, 1_000_000_000):
+        if integer_value % divisor == 0:
+            tokens.add(str(integer_value // divisor))
+    return tokens
+
+
+def _observed_numeric_tokens(text: str) -> set[str]:
+    tokens: set[str] = set()
+    normalized = text.replace(",", "")
+    for raw_token in normalized.split():
+        digits = _digits(raw_token)
+        if digits:
+            tokens.add(digits)
+    return tokens
 
 
 def _mean(values: Iterable[float]) -> float:
