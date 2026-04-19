@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: sec-filing-intelligence-copilot-api
+    runtime: python
+    plan: starter
+    buildCommand: pip install -e backend
+    startCommand: uvicorn sec_copilot.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_SYNTHESIS_MODEL
+        value: gpt-5-mini
+      - key: OPENAI_SYNTHESIS_MAX_OUTPUT_TOKENS
+        value: "600"
+      - key: OPENAI_SYNTHESIS_REASONING_EFFORT
+        value: minimal
+      - key: OPENAI_SYNTHESIS_TIMEOUT_SECONDS
+        value: "60"
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: SEC_USER_AGENT
+        sync: false

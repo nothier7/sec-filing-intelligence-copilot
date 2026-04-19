@@ -8,6 +8,12 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_name: str = "SEC Filing Intelligence Copilot"
     database_url: str = "postgresql+psycopg://sec_copilot:sec_copilot@localhost:5432/sec_copilot"
+    cors_allowed_origins: str = (
+        "http://127.0.0.1:3000,"
+        "http://127.0.0.1:3001,"
+        "http://localhost:3000,"
+        "http://localhost:3001"
+    )
     qdrant_url: str = "http://localhost:6333"
     qdrant_collection: str = "sec_filings"
     sec_user_agent: str = "SEC Filing Intelligence Copilot contact@example.com"
@@ -34,3 +40,7 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def parse_cors_allowed_origins(raw_origins: str) -> list[str]:
+    return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]

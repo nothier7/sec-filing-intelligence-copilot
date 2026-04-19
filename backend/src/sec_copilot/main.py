@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from sec_copilot.answering import AskRequest, AskResponse, CitedAnswerService
 from sec_copilot.comparison import CompareRequest, CompareResponse, FilingComparisonService
-from sec_copilot.config import get_settings
+from sec_copilot.config import get_settings, parse_cors_allowed_origins
 from sec_copilot.db.session import SessionLocal
 
 settings = get_settings()
@@ -19,12 +19,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
-        "http://localhost:3000",
-        "http://localhost:3001",
-    ],
+    allow_origins=parse_cors_allowed_origins(settings.cors_allowed_origins),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

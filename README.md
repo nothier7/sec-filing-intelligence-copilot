@@ -216,6 +216,13 @@ See [reports/aapl_real_eval.md](reports/aapl_real_eval.md),
 [reports/msft_real_eval.md](reports/msft_real_eval.md), and
 [evals/README.md](evals/README.md) for the tracked reports and benchmark schema.
 
+### Deployment
+
+The recommended public demo setup is a Vercel frontend, Render FastAPI backend,
+and Supabase Postgres database. See
+[docs/deployment-render-supabase.md](docs/deployment-render-supabase.md) for the
+environment variables, migration commands, seed commands, and smoke tests.
+
 ### Frontend
 
 ```bash
