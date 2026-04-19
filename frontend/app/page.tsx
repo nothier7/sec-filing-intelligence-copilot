@@ -4,6 +4,8 @@ import { FormEvent, useMemo, useState } from "react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
 
+type BenchmarkIssuer = "all" | "aapl" | "msft";
+
 const filings = [
   {
     accessionNumber: "0000320193-25-000079",
@@ -148,12 +150,222 @@ const benchmarkRows = [
   }
 ];
 
-const benchmarkFacts = [
-  { label: "Questions", value: "48" },
-  { label: "Filings", value: "4" },
-  { label: "Issuers", value: "AAPL + MSFT" },
-  { label: "Model baseline", value: "gpt-5-mini" }
-];
+const benchmarkDatasets: Record<
+  BenchmarkIssuer,
+  {
+    label: string;
+    title: string;
+    summary: string;
+    facts: { label: string; value: string }[];
+    rows: typeof benchmarkRows;
+    generated: string;
+  }
+> = {
+  all: {
+    label: "Apple + Microsoft",
+    title: "Structured SEC facts generalize across Apple and Microsoft.",
+    summary:
+      "The benchmark averages Apple and Microsoft filing evaluations across exact numeric accuracy, grounded validation, refusal behavior, and citation recall.",
+    facts: [
+      { label: "Questions", value: "48" },
+      { label: "Filings", value: "4" },
+      { label: "Issuers", value: "AAPL + MSFT" },
+      { label: "Model baseline", value: "gpt-5-mini" }
+    ],
+    rows: benchmarkRows,
+    generated: "Generated 2026-04-19"
+  },
+  aapl: {
+    label: "Apple",
+    title: "Apple filings stay grounded when revenue and expense questions vary.",
+    summary:
+      "Apple questions cover the FY 2025 Form 10-K and Q1 FY 2026 Form 10-Q, including numeric facts, risk language, controls, and refusal cases.",
+    facts: [
+      { label: "Questions", value: "24" },
+      { label: "Filings", value: "2" },
+      { label: "Issuer", value: "AAPL" },
+      { label: "Best accuracy", value: "100%" }
+    ],
+    rows: [
+      {
+        variant: "Closed book",
+        role: "No filing context",
+        accuracy: 8.3,
+        numericAccuracy: 0,
+        groundedAccuracy: 0,
+        refusalAccuracy: 50,
+        evidenceRecall: 16.7,
+        latency: "0.0 ms"
+      },
+      {
+        variant: "Naive RAG",
+        role: "Unfiltered retrieval",
+        accuracy: 33.3,
+        numericAccuracy: 16.7,
+        groundedAccuracy: 0,
+        refusalAccuracy: 50,
+        evidenceRecall: 83.3,
+        latency: "45.6 ms"
+      },
+      {
+        variant: "Filtered RAG",
+        role: "Metadata-aware retrieval",
+        accuracy: 54.2,
+        numericAccuracy: 16.7,
+        groundedAccuracy: 0,
+        refusalAccuracy: 75,
+        evidenceRecall: 100,
+        latency: "38.7 ms"
+      },
+      {
+        variant: "GPT-5 mini closed book",
+        role: "Generic model baseline",
+        accuracy: 8.3,
+        numericAccuracy: 0,
+        groundedAccuracy: 0,
+        refusalAccuracy: 50,
+        evidenceRecall: 16.7,
+        latency: "API"
+      },
+      {
+        variant: "GPT-5 mini + retrieved context",
+        role: "External model with excerpts",
+        accuracy: 41.7,
+        numericAccuracy: 58.3,
+        groundedAccuracy: 0,
+        refusalAccuracy: 50,
+        evidenceRecall: 100,
+        latency: "API"
+      },
+      {
+        variant: "GPT-5 mini + web search",
+        role: "External model with web access",
+        accuracy: 62.5,
+        numericAccuracy: 75,
+        groundedAccuracy: 0,
+        refusalAccuracy: 100,
+        evidenceRecall: 16.7,
+        latency: "API"
+      },
+      {
+        variant: "Filtered RAG + XBRL",
+        role: "Retrieval plus structured facts",
+        accuracy: 100,
+        numericAccuracy: 100,
+        groundedAccuracy: 100,
+        refusalAccuracy: 100,
+        evidenceRecall: 100,
+        latency: "41.9 ms"
+      },
+      {
+        variant: "Guarded LLM + XBRL",
+        role: "Polished answer with fact guards",
+        accuracy: 100,
+        numericAccuracy: 100,
+        groundedAccuracy: 100,
+        refusalAccuracy: 100,
+        evidenceRecall: 100,
+        latency: "2.1 s"
+      }
+    ],
+    generated: "Apple eval · 2026-04-19"
+  },
+  msft: {
+    label: "Microsoft",
+    title: "Microsoft filings expose where generic baselines lose grounding.",
+    summary:
+      "Microsoft questions cover the FY 2025 Form 10-K and FY 2026 quarterly filings, including financial facts, AI/export-control risks, segments, and refusal cases.",
+    facts: [
+      { label: "Questions", value: "24" },
+      { label: "Filings", value: "2" },
+      { label: "Issuer", value: "MSFT" },
+      { label: "Best accuracy", value: "100%" }
+    ],
+    rows: [
+      {
+        variant: "Closed book",
+        role: "No filing context",
+        accuracy: 8.3,
+        numericAccuracy: 0,
+        groundedAccuracy: 0,
+        refusalAccuracy: 50,
+        evidenceRecall: 16.7,
+        latency: "0.0 ms"
+      },
+      {
+        variant: "Naive RAG",
+        role: "Unfiltered retrieval",
+        accuracy: 29.2,
+        numericAccuracy: 16.7,
+        groundedAccuracy: 0,
+        refusalAccuracy: 50,
+        evidenceRecall: 64.6,
+        latency: "58.9 ms"
+      },
+      {
+        variant: "Filtered RAG",
+        role: "Metadata-aware retrieval",
+        accuracy: 50,
+        numericAccuracy: 8.3,
+        groundedAccuracy: 0,
+        refusalAccuracy: 75,
+        evidenceRecall: 100,
+        latency: "55.6 ms"
+      },
+      {
+        variant: "GPT-5 mini closed book",
+        role: "Generic model baseline",
+        accuracy: 8.3,
+        numericAccuracy: 0,
+        groundedAccuracy: 0,
+        refusalAccuracy: 50,
+        evidenceRecall: 16.7,
+        latency: "API"
+      },
+      {
+        variant: "GPT-5 mini + retrieved context",
+        role: "External model with excerpts",
+        accuracy: 33.3,
+        numericAccuracy: 41.7,
+        groundedAccuracy: 0,
+        refusalAccuracy: 50,
+        evidenceRecall: 100,
+        latency: "API"
+      },
+      {
+        variant: "GPT-5 mini + web search",
+        role: "External model with web access",
+        accuracy: 20.8,
+        numericAccuracy: 16.7,
+        groundedAccuracy: 0,
+        refusalAccuracy: 50,
+        evidenceRecall: 16.7,
+        latency: "API"
+      },
+      {
+        variant: "Filtered RAG + XBRL",
+        role: "Retrieval plus structured facts",
+        accuracy: 100,
+        numericAccuracy: 100,
+        groundedAccuracy: 100,
+        refusalAccuracy: 100,
+        evidenceRecall: 100,
+        latency: "58.5 ms"
+      },
+      {
+        variant: "Guarded LLM + XBRL",
+        role: "Polished answer with fact guards",
+        accuracy: 100,
+        numericAccuracy: 100,
+        groundedAccuracy: 100,
+        refusalAccuracy: 100,
+        evidenceRecall: 100,
+        latency: "1.9 s"
+      }
+    ],
+    generated: "Microsoft eval · 2026-04-19"
+  }
+};
 
 const benchmarkFailures = [
   {
@@ -257,6 +469,7 @@ export default function Home() {
   const [compareResponse, setCompareResponse] = useState<CompareResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [benchmarkIssuer, setBenchmarkIssuer] = useState<BenchmarkIssuer>("all");
 
   const selectedFiling = useMemo(
     () => filings.find((filing) => filing.accessionNumber === accessionNumber),
@@ -267,6 +480,7 @@ export default function Home() {
     event.preventDefault();
     setIsLoading(true);
     setError(null);
+    setAskResponse(null);
     setCompareResponse(null);
     try {
       const response = await fetch(`${API_BASE_URL}/ask`, {
@@ -297,6 +511,7 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
     setAskResponse(null);
+    setCompareResponse(null);
     try {
       const response = await fetch(`${API_BASE_URL}/compare`, {
         method: "POST",
@@ -328,7 +543,6 @@ export default function Home() {
             <p className="eyebrow">Live SEC filing workbench</p>
             <h1 id="workspace-title">Ask SEC filings with citations and XBRL checks.</h1>
           </div>
-          <div className="api-chip">Backend: {API_BASE_URL}</div>
         </div>
 
         <div className="research-grid">
@@ -495,7 +709,10 @@ export default function Home() {
                 </button>
               </form>
             ) : (
-              <BenchmarkBrief />
+              <BenchmarkBrief
+                benchmarkIssuer={benchmarkIssuer}
+                onBenchmarkIssuerChange={setBenchmarkIssuer}
+              />
             )}
 
             <div className="sample-block" aria-label="Sample questions">
@@ -523,27 +740,27 @@ export default function Home() {
             <div className="filing-strip">
               {mode === "benchmark" ? (
                 <>
-                  <span>Multi-issuer eval</span>
-                  <strong>48 real questions</strong>
-                  <span>Apple + Microsoft filings</span>
-                  <code>gpt-5-mini baselines</code>
+                  <span>Benchmark</span>
+                  <strong>{benchmarkDatasets[benchmarkIssuer].label}</strong>
+                  <span>{benchmarkDatasets[benchmarkIssuer].facts[0].value} real questions</span>
                 </>
               ) : (
                 <>
                   <span>{selectedFiling?.formType}</span>
                   <strong>{selectedFiling?.period}</strong>
                   <span>{selectedFiling?.filedDate}</span>
-                  <code>{accessionNumber}</code>
+                  <span>{selectedFiling?.label}</span>
                 </>
               )}
             </div>
 
             {mode === "benchmark" ? (
-              <BenchmarkResult />
+              <BenchmarkResult benchmarkIssuer={benchmarkIssuer} />
             ) : (
               <>
                 {error ? <div className="error-box">{error}</div> : null}
-                {!askResponse && !compareResponse && !error ? <EmptyState /> : null}
+                {isLoading ? <LoadingState mode={mode} answerMode={answerMode} /> : null}
+                {!askResponse && !compareResponse && !error && !isLoading ? <EmptyState /> : null}
                 {askResponse ? <AskResult response={askResponse} /> : null}
                 {compareResponse ? <CompareResult response={compareResponse} /> : null}
               </>
@@ -555,24 +772,34 @@ export default function Home() {
   );
 }
 
-function BenchmarkBrief() {
+function BenchmarkBrief({
+  benchmarkIssuer,
+  onBenchmarkIssuerChange
+}: {
+  benchmarkIssuer: BenchmarkIssuer;
+  onBenchmarkIssuerChange: (issuer: BenchmarkIssuer) => void;
+}) {
+  const dataset = benchmarkDatasets[benchmarkIssuer];
   return (
     <section className="benchmark-brief" aria-label="Benchmark summary">
       <p className="panel-kicker">Tracked benchmark</p>
       <h2>Real filing questions, measured against generic model baselines.</h2>
-      <p>
-        The benchmark averages Apple and Microsoft real filing evaluations to test
-        exact numeric accuracy, grounded numeric validation, refusal behavior, and
-        citation recall.
-      </p>
+      <p>{dataset.summary}</p>
+      <label htmlFor="benchmark-issuer">Company filter</label>
+      <select
+        id="benchmark-issuer"
+        value={benchmarkIssuer}
+        onChange={(event) => onBenchmarkIssuerChange(event.target.value as BenchmarkIssuer)}
+      >
+        <option value="all">Apple + Microsoft</option>
+        <option value="aapl">Apple</option>
+        <option value="msft">Microsoft</option>
+      </select>
       <div className="brief-grid">
-        {benchmarkFacts.map((fact) => (
+        {dataset.facts.map((fact) => (
           <Metric key={fact.label} label={fact.label} value={fact.value} />
         ))}
       </div>
-      <code className="benchmark-command">
-        .venv/bin/python -m sec_copilot.cli run-eval --variant improved_rag_xbrl_llm
-      </code>
     </section>
   );
 }
@@ -581,28 +808,51 @@ function EmptyState() {
   return (
     <div className="empty-state">
       <p className="panel-kicker">Ready</p>
-      <h2>Run a question against the local SEC database.</h2>
+      <h2>Ask a filing question and get a cited answer.</h2>
       <p>
-        Try the revenue questions first. They should return a cited answer plus a
-        validated XBRL fact when the backend is using `data/sec_copilot_real.db`.
+        Try the revenue questions first. They return SEC citations plus a validated
+        XBRL fact when the filing contains the requested metric.
       </p>
     </div>
   );
 }
 
-function BenchmarkResult() {
+function LoadingState({ mode, answerMode }: { mode: Mode; answerMode: AnswerMode }) {
+  const message =
+    mode === "compare"
+      ? "Comparing the selected filings and collecting cited changes."
+      : answerMode === "llm"
+        ? "Retrieving filing evidence, validating XBRL facts, then polishing the answer."
+        : "Retrieving filing evidence and checking citations.";
+
+  return (
+    <div className="loading-state" role="status" aria-live="polite">
+      <span className="loading-spinner" aria-hidden="true" />
+      <div>
+        <p className="panel-kicker">Thinking</p>
+        <strong>{message}</strong>
+      </div>
+    </div>
+  );
+}
+
+function BenchmarkResult({ benchmarkIssuer }: { benchmarkIssuer: BenchmarkIssuer }) {
+  const dataset = benchmarkDatasets[benchmarkIssuer];
   return (
     <div className="result-stack benchmark-result">
       <div className="answer-heading">
         <p className="panel-kicker">Evaluation</p>
-        <span>Generated 2026-04-19</span>
+        <span>{dataset.generated}</span>
       </div>
-      <h2>Structured SEC facts generalize across Apple and Microsoft.</h2>
+      <h2>{dataset.title}</h2>
 
       <div className="benchmark-scoreboard" aria-label="Benchmark headline metrics">
-        <Metric label="Best overall accuracy" value="100%" />
-        <Metric label="Best grounded numeric accuracy" value="100%" />
-        <Metric label="Guarded synthesis latency" value="2.0s avg" />
+        <Metric label="Best overall accuracy" value={bestMetric(dataset.rows, "accuracy")} />
+        <Metric
+          label="Best grounded numeric accuracy"
+          value={bestMetric(dataset.rows, "groundedAccuracy")}
+        />
+        <Metric label="Guarded synthesis latency" value={guardedLatency(dataset.rows)} />
       </div>
 
       <div className="benchmark-table-wrap">
@@ -619,7 +869,7 @@ function BenchmarkResult() {
             </tr>
           </thead>
           <tbody>
-            {benchmarkRows.map((row) => (
+            {dataset.rows.map((row) => (
               <tr key={row.variant} className={row.groundedAccuracy === 100 ? "winner-row" : ""}>
                 <th scope="row">
                   <strong>{row.variant}</strong>
@@ -660,14 +910,29 @@ function ScoreCell({ value }: { value: number }) {
   );
 }
 
+function bestMetric(
+  rows: typeof benchmarkRows,
+  key: "accuracy" | "groundedAccuracy" | "numericAccuracy"
+) {
+  return `${Math.max(...rows.map((row) => row[key])).toFixed(0)}%`;
+}
+
+function guardedLatency(rows: typeof benchmarkRows) {
+  return rows.find((row) => row.variant === "Guarded LLM + XBRL")?.latency ?? "n/a";
+}
+
 function AskResult({ response }: { response: AskResponse }) {
   return (
     <div className="result-stack">
-      <div className="answer-heading">
-        <p className="panel-kicker">{response.supported ? "Supported answer" : "Insufficient evidence"}</p>
-        <span>{Math.round(response.confidence * 100)}% confidence</span>
-      </div>
-      <h2>{response.answer}</h2>
+      <section className={`answer-card ${response.supported ? "supported" : "unsupported"}`}>
+        <div className="answer-heading">
+          <p className="panel-kicker">
+            {response.supported ? "Supported answer" : "Insufficient evidence"}
+          </p>
+          <ConfidenceBadge confidence={response.confidence} />
+        </div>
+        <h2>{response.answer}</h2>
+      </section>
       <div className="metric-grid">
         <Metric label="Query type" value={response.query_type} />
         <Metric label="Answer mode" value={formatAnswerMode(response.answer_mode)} />
@@ -706,6 +971,12 @@ function AskResult({ response }: { response: AskResponse }) {
       <CitationList citations={response.citations} />
     </div>
   );
+}
+
+function ConfidenceBadge({ confidence }: { confidence: number }) {
+  const percent = Math.round(confidence * 100);
+  const tone = percent >= 80 ? "high" : percent >= 50 ? "medium" : "low";
+  return <span className={`confidence-badge ${tone}`}>{percent}% confidence</span>;
 }
 
 function formatAnswerMode(answerMode: AnswerMode) {
