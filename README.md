@@ -4,19 +4,23 @@ A deployable RAG system for asking cited questions over public SEC filings. The 
 
 ## Current Status
 
-The local portfolio demo is implemented end to end: app scaffolding, persistence,
-SEC ingestion, filing parsing, chunking, LlamaIndex retrieval plumbing, cited
-answer generation, XBRL numeric grounding, filing change detection, deterministic
-evaluation, and a small local web UI.
+The public portfolio demo is implemented and deployed end to end: SEC ingestion,
+filing parsing, chunking, LlamaIndex retrieval, cited answer generation, XBRL
+numeric grounding, guarded OpenAI answer synthesis, filing change detection,
+benchmarking, and a Next.js web UI.
+
+- Live app: https://sec-filing-intelligence-copilot-rag.vercel.app
+- API health: https://sec-filing-intelligence-copilot.onrender.com/health
 
 ## Project Shape
 
 - Backend: FastAPI
 - Frontend: Next.js and React
-- Metadata store: Postgres
-- Vector store: Qdrant
-- Retrieval orchestration: LlamaIndex
-- Evaluation: deterministic local benchmark harness with FinanceBench-compatible extension points
+- Database: Supabase Postgres in production, SQLite/Postgres for local workflows
+- Retrieval orchestration: LlamaIndex with an in-memory vector index for the deployed demo
+- Optional vector indexing: Qdrant support exists in the CLI, but Qdrant is not used by the live deployment
+- LLM layer: OpenAI guarded synthesis over already-cited and XBRL-grounded answers
+- Evaluation: deterministic benchmark harness plus OpenAI baseline comparisons
 
 ## Why This Is Useful
 
@@ -40,7 +44,7 @@ Copy the sample environment file before running services:
 cp .env.example .env
 ```
 
-Docker is optional. It is useful for running Postgres and Qdrant locally, but the public deployment can use managed services instead.
+Docker is optional. It is useful for running local Postgres, but the public deployment uses managed Supabase Postgres.
 
 ### Backend
 
@@ -65,7 +69,7 @@ The backend uses SQLAlchemy models and Alembic migrations. With `DATABASE_URL` p
 make db-upgrade
 ```
 
-Milestone 2 tests use SQLite in memory, so the persistence layer can be verified without Docker.
+Persistence tests use SQLite in memory, so the data layer can be verified without Docker.
 
 ### SEC Ingestion
 
@@ -91,26 +95,30 @@ a cached filing document into normalized filing sections and deterministic chunk
 
 ### Retrieval
 
-Milestone 5 adds LlamaIndex node construction and local retrieval over parsed chunks:
+The main retrieval path builds LlamaIndex nodes from parsed chunks and uses an
+in-memory vector index for local and deployed demo queries:
 
 ```bash
 DATABASE_URL=sqlite:///data/sec_copilot.db .venv/bin/sec-copilot retrieve-sec-filing \
   <ACCESSION_NUMBER> "supply chain regulatory risks" --section-type risk_factors
 ```
 
-For Qdrant-backed indexing, use either a running Qdrant URL or local Qdrant storage path:
+The project also includes optional Qdrant indexing support for future persistent
+vector-store experiments. This is not part of the current public deployment. To
+try it locally, use either a running Qdrant URL or a local Qdrant storage path:
 
 ```bash
 DATABASE_URL=sqlite:///data/sec_copilot.db .venv/bin/sec-copilot index-sec-filing \
   <ACCESSION_NUMBER> --qdrant-path data/qdrant-local --collection sec_filings
 ```
 
-The project currently uses deterministic local dense and sparse hash embeddings for
-tests and offline smoke workflows. Production retrieval can swap in stronger
-embedding and sparse retrieval models without changing the stored chunk schema.
-Pass `--hybrid` to enable Qdrant hybrid indexing with the built-in sparse hashing
-path, or `--fastembed-sparse-model` if you have FastEmbed installed and want to
-use a named sparse model.
+The project currently uses deterministic local dense and sparse hash embeddings
+for tests, offline smoke workflows, and the public demo retrieval path. A later
+upgrade can replace this with persistent Qdrant retrieval and stronger embedding
+models without changing the stored chunk schema. Pass `--hybrid` to enable Qdrant
+hybrid indexing with the built-in sparse hashing path, or
+`--fastembed-sparse-model` if you have FastEmbed installed and want to use a
+named sparse model.
 
 ### Cited Answers
 
@@ -134,12 +142,13 @@ curl -X POST http://127.0.0.1:8000/ask \
   }'
 ```
 
-The current answer generator is deterministic and extractive: it only answers
-from retrieved chunks, returns citation snippets, and uses structured XBRL facts
-when numeric grounding is available. It uses insufficient-evidence responses for
-unsupported prompts, weak retrieval, missing structured numeric facts, and
-mismatches between retrieved numeric text and structured facts. A later milestone
-can replace the synthesizer with an LLM while keeping the same response contract.
+The deterministic answer generator only answers from retrieved chunks, returns
+citation snippets, and uses structured XBRL facts when numeric grounding is
+available. It uses insufficient-evidence responses for unsupported prompts, weak
+retrieval, missing structured numeric facts, and mismatches between retrieved
+numeric text and structured facts. Guarded LLM mode can then polish supported
+answers with OpenAI while preserving exact numeric values, citations, refusal
+behavior, and XBRL grounding.
 
 Numeric answers include a `numeric_grounding` array with validation status:
 
@@ -238,10 +247,16 @@ Open `http://127.0.0.1:3000`.
 If Docker is installed, run:
 
 ```bash
-docker compose up -d postgres qdrant
+docker compose up -d postgres
 ```
 
-Without Docker, use managed Postgres and Qdrant, then set `DATABASE_URL` and `QDRANT_URL` in `.env`.
+Without Docker, use managed Postgres and set `DATABASE_URL` in `.env`. Set
+`QDRANT_URL` only if you are experimenting with the optional Qdrant indexing path.
+For local Qdrant experiments, start it separately:
+
+```bash
+docker compose up -d qdrant
+```
 
 ## Planning Docs
 
