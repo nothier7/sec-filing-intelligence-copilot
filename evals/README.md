@@ -54,6 +54,34 @@ The web-search baseline reached 62.5% accuracy and 75.0% numeric accuracy, but
 still had 0% grounded numeric accuracy because web citations are not structured
 XBRL validation.
 
+## Real Microsoft Benchmark
+
+`evals/questions/msft_real_2025_2026.jsonl` is a second-issuer portfolio benchmark
+for locally ingested Microsoft filings:
+
+- FY2025 Form 10-K: `0000950170-25-100235`
+- Q2 FY2026 Form 10-Q: `0001193125-26-027207`
+
+Run it against a local database containing those filings:
+
+```bash
+PYTHONPATH=backend/src DATABASE_URL=sqlite:///data/sec_copilot_real.db \
+  .venv/bin/python -m sec_copilot.cli run-eval \
+  --dataset evals/questions/msft_real_2025_2026.jsonl \
+  --output evals/results/msft_real_eval.json \
+  --report evals/results/msft_real_eval.md
+```
+
+The current tracked Microsoft report is `reports/msft_real_eval.md`. In the latest
+local run, `improved_rag_xbrl` reached 100% accuracy, 100% numeric accuracy, 100%
+grounded numeric accuracy, 100% refusal accuracy, and 100% evidence recall across
+24 real SEC questions. `openai_retrieved_context` reached 33.3% accuracy and 41.7%
+numeric accuracy. The web-search baseline reached 20.8% accuracy and 16.7% numeric
+accuracy. Both OpenAI baselines had 0% grounded numeric accuracy.
+
+Across the Apple and Microsoft reports, the tracked benchmark now covers 48 real
+questions across four filings and two issuers.
+
 To include OpenAI baselines, add `OPENAI_API_KEY` to your local `.env` and pass the
 OpenAI variants explicitly:
 

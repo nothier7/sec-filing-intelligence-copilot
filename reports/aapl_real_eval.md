@@ -110,4 +110,7 @@ PYTHONPATH=backend/src DATABASE_URL=sqlite:///data/sec_copilot_real.db \
 
 ## Current Limitations
 
-This is a focused portfolio benchmark, not a broad public leaderboard. It covers one issuer and two filings. The next evaluation step is to add more issuers, more filing types, and harder questions where citation coverage and answer phrasing are graded separately.
+This is a focused portfolio benchmark, not a broad public leaderboard. It is now
+paired with a Microsoft benchmark in `reports/msft_real_eval.md`. The next
+evaluation step is to add more issuers, more filing types, and harder questions
+where citation coverage and answer phrasing are graded separately.

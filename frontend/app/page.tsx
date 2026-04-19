@@ -18,14 +18,51 @@ const filings = [
     period: "Q1 FY 2026",
     formType: "10-Q",
     filedDate: "2026-01-30"
+  },
+  {
+    accessionNumber: "0000950170-25-100235",
+    label: "Microsoft 2025 Form 10-K",
+    period: "FY 2025",
+    formType: "10-K",
+    filedDate: "2025-07-30"
+  },
+  {
+    accessionNumber: "0001193125-25-256321",
+    label: "Microsoft Q1 2026 Form 10-Q",
+    period: "Q1 FY 2026",
+    formType: "10-Q",
+    filedDate: "2025-10-29"
+  },
+  {
+    accessionNumber: "0001193125-26-027207",
+    label: "Microsoft Q2 2026 Form 10-Q",
+    period: "Q2 FY 2026",
+    formType: "10-Q",
+    filedDate: "2026-01-28"
   }
 ];
 
 const sampleQuestions = [
-  "How much revenue did Apple report in 2025?",
-  "How much revenue did Apple report in Q1 2026?",
-  "What supply chain risks does Apple describe?",
-  "Should I buy this stock?"
+  {
+    question: "How much revenue did Apple report in 2025?",
+    accessionNumber: "0000320193-25-000079",
+    sectionType: "mda"
+  },
+  {
+    question: "How much revenue did Microsoft report in fiscal 2025?",
+    accessionNumber: "0000950170-25-100235",
+    sectionType: "mda"
+  },
+  {
+    question: "What trade, tariff, and AI export control risks does Microsoft describe?",
+    accessionNumber: "0001193125-26-027207",
+    sectionType: "risk_factors"
+  },
+  {
+    question: "Should I buy this stock?",
+    accessionNumber: "0000320193-25-000079",
+    sectionType: "all"
+  }
 ];
 
 const benchmarkRows = [
@@ -42,22 +79,22 @@ const benchmarkRows = [
   {
     variant: "Naive RAG",
     role: "Unfiltered retrieval",
-    accuracy: 33.3,
+    accuracy: 31.3,
     numericAccuracy: 16.7,
     groundedAccuracy: 0,
     refusalAccuracy: 50,
-    evidenceRecall: 83.3,
-    latency: "42.1 ms"
+    evidenceRecall: 74,
+    latency: "62.8 ms"
   },
   {
     variant: "Filtered RAG",
     role: "Metadata-aware retrieval",
-    accuracy: 54.2,
-    numericAccuracy: 16.7,
+    accuracy: 52.1,
+    numericAccuracy: 12.5,
     groundedAccuracy: 0,
     refusalAccuracy: 75,
     evidenceRecall: 100,
-    latency: "37.2 ms"
+    latency: "46.4 ms"
   },
   {
     variant: "GPT-5 mini closed book",
@@ -67,27 +104,27 @@ const benchmarkRows = [
     groundedAccuracy: 0,
     refusalAccuracy: 50,
     evidenceRecall: 16.7,
-    latency: "cached"
+    latency: "API"
   },
   {
     variant: "GPT-5 mini + retrieved context",
     role: "External model with excerpts",
-    accuracy: 41.7,
-    numericAccuracy: 58.3,
+    accuracy: 37.5,
+    numericAccuracy: 50,
     groundedAccuracy: 0,
     refusalAccuracy: 50,
     evidenceRecall: 100,
-    latency: "cached"
+    latency: "API"
   },
   {
     variant: "GPT-5 mini + web search",
     role: "External model with web access",
-    accuracy: 62.5,
-    numericAccuracy: 75,
+    accuracy: 41.7,
+    numericAccuracy: 45.8,
     groundedAccuracy: 0,
-    refusalAccuracy: 100,
+    refusalAccuracy: 75,
     evidenceRecall: 16.7,
-    latency: "cached"
+    latency: "API"
   },
   {
     variant: "Filtered RAG + XBRL",
@@ -97,29 +134,29 @@ const benchmarkRows = [
     groundedAccuracy: 100,
     refusalAccuracy: 100,
     evidenceRecall: 100,
-    latency: "40.2 ms"
+    latency: "49.5 ms"
   }
 ];
 
 const benchmarkFacts = [
-  { label: "Questions", value: "24" },
-  { label: "Filings", value: "2" },
-  { label: "Issuer", value: "AAPL" },
+  { label: "Questions", value: "48" },
+  { label: "Filings", value: "4" },
+  { label: "Issuers", value: "AAPL + MSFT" },
   { label: "Model baseline", value: "gpt-5-mini" }
 ];
 
 const benchmarkFailures = [
   {
     label: "Closed-book limit",
-    text: "GPT-5 mini refused the 2025 revenue question without filing evidence. The validated XBRL value is $416.161B."
+    text: "GPT-5 mini refused issuer-specific filing questions without local evidence. The XBRL path answers exact values from parsed SEC facts."
   },
   {
     label: "Web-search limit",
-    text: "GPT-5 mini with web search found many public numbers, but still had 0% grounded numeric accuracy."
+    text: "Web search can find public numbers, but it still has 0% grounded numeric accuracy because it is not validating against local XBRL rows."
   },
   {
     label: "Structured fix",
-    text: "The XBRL-grounded variant validates financial values against parsed SEC facts before returning the final answer."
+    text: "The strongest variant combines metadata-filtered retrieval, citation checks, refusal handling, and XBRL fact validation."
   }
 ];
 
@@ -196,7 +233,7 @@ export default function Home() {
     filings[1].accessionNumber
   );
   const [sectionType, setSectionType] = useState("all");
-  const [question, setQuestion] = useState(sampleQuestions[0]);
+  const [question, setQuestion] = useState(sampleQuestions[0].question);
   const [askResponse, setAskResponse] = useState<AskResponse | null>(null);
   const [compareResponse, setCompareResponse] = useState<CompareResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -269,7 +306,7 @@ export default function Home() {
         <div className="command-bar">
           <div>
             <p className="eyebrow">Live SEC filing workbench</p>
-            <h1 id="workspace-title">Ask Apple filings with citations and XBRL checks.</h1>
+            <h1 id="workspace-title">Ask SEC filings with citations and XBRL checks.</h1>
           </div>
           <div className="api-chip">Backend: {API_BASE_URL}</div>
         </div>
@@ -342,9 +379,11 @@ export default function Home() {
                 >
                   <option value="all">All sections</option>
                   <option value="risk_factors">Risk Factors</option>
+                  <option value="business">Business</option>
                   <option value="mda">MD&A</option>
                   <option value="financial_statements">Financial Statements</option>
                   <option value="controls">Controls</option>
+                  <option value="legal_proceedings">Legal Proceedings</option>
                 </select>
 
                 <label htmlFor="question">Question</label>
@@ -407,18 +446,19 @@ export default function Home() {
             <div className="sample-block" aria-label="Sample questions">
               {sampleQuestions.map((sampleQuestion) => (
                 <button
-                  key={sampleQuestion}
+                  key={sampleQuestion.question}
                   type="button"
                   onClick={() => {
                     setMode("ask");
                     setAskResponse(null);
                     setCompareResponse(null);
                     setError(null);
-                    setQuestion(sampleQuestion);
-                    setSectionType(sampleQuestion.includes("supply") ? "risk_factors" : "all");
+                    setQuestion(sampleQuestion.question);
+                    setAccessionNumber(sampleQuestion.accessionNumber);
+                    setSectionType(sampleQuestion.sectionType);
                   }}
                 >
-                  {sampleQuestion}
+                  {sampleQuestion.question}
                 </button>
               ))}
             </div>
@@ -428,10 +468,10 @@ export default function Home() {
             <div className="filing-strip">
               {mode === "benchmark" ? (
                 <>
-                  <span>Apple eval</span>
-                  <strong>24 real questions</strong>
-                  <span>2025 10-K + Q1 2026 10-Q</span>
-                  <code>gpt-5-mini baseline</code>
+                  <span>Multi-issuer eval</span>
+                  <strong>48 real questions</strong>
+                  <span>Apple + Microsoft filings</span>
+                  <code>gpt-5-mini baselines</code>
                 </>
               ) : (
                 <>
@@ -466,8 +506,9 @@ function BenchmarkBrief() {
       <p className="panel-kicker">Tracked benchmark</p>
       <h2>Real filing questions, measured against generic model baselines.</h2>
       <p>
-        The benchmark uses Apple’s FY2025 10-K and Q1 FY2026 10-Q to test numeric
-        accuracy, grounded numeric accuracy, refusal behavior, and citation recall.
+        The benchmark averages Apple and Microsoft real filing evaluations to test
+        exact numeric accuracy, grounded numeric validation, refusal behavior, and
+        citation recall.
       </p>
       <div className="brief-grid">
         {benchmarkFacts.map((fact) => (
@@ -501,7 +542,7 @@ function BenchmarkResult() {
         <p className="panel-kicker">Evaluation</p>
         <span>Generated 2026-04-19</span>
       </div>
-      <h2>Structured SEC facts beat context-only answers on grounded financial QA.</h2>
+      <h2>Structured SEC facts generalize across Apple and Microsoft.</h2>
 
       <div className="benchmark-scoreboard" aria-label="Benchmark headline metrics">
         <Metric label="Best overall accuracy" value="100%" />
