@@ -36,6 +36,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Ignore cached SEC JSON/documents and refetch from SEC",
     )
+    ingest.add_argument(
+        "--fact-concepts",
+        nargs="+",
+        help="Optional XBRL concept names to import from SEC company facts",
+    )
+    ingest.add_argument(
+        "--facts-for-ingested-filings-only",
+        action="store_true",
+        help="Only import XBRL facts whose accession number matches an ingested filing",
+    )
 
     parse = subparsers.add_parser(
         "parse-sec-filing",
@@ -162,6 +172,8 @@ def main() -> None:
                     cik=args.cik,
                     form_types=args.forms,
                     filing_limit=args.limit,
+                    fact_concepts=args.fact_concepts,
+                    facts_for_ingested_filings_only=args.facts_for_ingested_filings_only,
                     download_documents=not args.skip_documents,
                     use_cache=not args.refresh,
                 )

@@ -48,15 +48,39 @@ DATABASE_URL="postgresql+psycopg://..." \
 Then ingest and parse the demo filings. Ingestion stores filing metadata,
 downloads source documents to the local cache, and stores XBRL facts in Supabase.
 Parsing creates the filing sections and chunks that the deployed API retrieves.
+The `--fact-concepts` filter keeps deployment seeding fast by importing only
+concepts the app can answer. The `--facts-for-ingested-filings-only` filter keeps
+the import scoped to the demo filings instead of importing every historical fact
+for the issuer.
 
 ```bash
 PYTHONPATH=backend/src DATABASE_URL="postgresql+psycopg://..." \
   .venv/bin/python -m sec_copilot.cli ingest-sec-company 320193 \
-  --limit 4 --forms 10-K 10-Q
+  --limit 4 --forms 10-K 10-Q \
+  --facts-for-ingested-filings-only \
+  --fact-concepts RevenueFromContractWithCustomerExcludingAssessedTax Revenues SalesRevenueNet \
+  NetIncomeLoss ProfitLoss OperatingIncomeLoss OperatingExpenses ResearchAndDevelopmentExpense \
+  SellingGeneralAndAdministrativeExpense GeneralAndAdministrativeExpense CostOfGoodsAndServicesSold \
+  CostOfRevenue Assets Liabilities NetCashProvidedByUsedInOperatingActivities \
+  CashAndCashEquivalentsAtCarryingValue CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents \
+  CashAndCashEquivalentsAndShortTermInvestments PaymentsToAcquirePropertyPlantAndEquipment \
+  PaymentsForRepurchaseOfCommonStock PaymentsOfDividends PaymentsOfDividendsCommonStock \
+  PaymentsOfDividendsAndDividendEquivalentsOnCommonStockAndRestrictedStockUnits \
+  EarningsPerShareDiluted EarningsPerShareBasic
 
 PYTHONPATH=backend/src DATABASE_URL="postgresql+psycopg://..." \
   .venv/bin/python -m sec_copilot.cli ingest-sec-company 789019 \
-  --limit 4 --forms 10-K 10-Q
+  --limit 4 --forms 10-K 10-Q \
+  --facts-for-ingested-filings-only \
+  --fact-concepts RevenueFromContractWithCustomerExcludingAssessedTax Revenues SalesRevenueNet \
+  NetIncomeLoss ProfitLoss OperatingIncomeLoss OperatingExpenses ResearchAndDevelopmentExpense \
+  SellingGeneralAndAdministrativeExpense GeneralAndAdministrativeExpense CostOfGoodsAndServicesSold \
+  CostOfRevenue Assets Liabilities NetCashProvidedByUsedInOperatingActivities \
+  CashAndCashEquivalentsAtCarryingValue CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents \
+  CashAndCashEquivalentsAndShortTermInvestments PaymentsToAcquirePropertyPlantAndEquipment \
+  PaymentsForRepurchaseOfCommonStock PaymentsOfDividends PaymentsOfDividendsCommonStock \
+  PaymentsOfDividendsAndDividendEquivalentsOnCommonStockAndRestrictedStockUnits \
+  EarningsPerShareDiluted EarningsPerShareBasic
 ```
 
 Parse the filings used by the UI and tracked benchmarks:

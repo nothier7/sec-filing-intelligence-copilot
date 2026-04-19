@@ -41,6 +41,7 @@ class SecIngestionService:
         form_types: Sequence[str] = ("10-K", "10-Q"),
         filing_limit: int = 10,
         fact_concepts: Optional[Sequence[str]] = None,
+        facts_for_ingested_filings_only: bool = False,
         download_documents: bool = True,
         use_cache: bool = True,
     ) -> SecIngestionResult:
@@ -99,10 +100,18 @@ class SecIngestionService:
                 raw_artifact_path=raw_artifact_path,
             )
 
+        ingested_accession_numbers = {
+            normalized_filing.accession_number for normalized_filing in normalized_filings
+        }
         company_facts = self.client.fetch_company_facts(cik, use_cache=use_cache)
         xbrl_facts_created = 0
         xbrl_facts_updated = 0
         for normalized_fact in normalize_company_facts(company_facts, concepts=fact_concepts):
+            if (
+                facts_for_ingested_filings_only
+                and normalized_fact.accession_number not in ingested_accession_numbers
+            ):
+                continue
             existing_fact = self.xbrl_facts.get_by_source_key(normalized_fact.source_key)
             if existing_fact is None:
                 xbrl_facts_created += 1
@@ -146,4 +155,3 @@ class SecIngestionService:
 
 def _path_to_string(path: Path) -> str:
     return path.as_posix()
-
