@@ -121,6 +121,7 @@ Set these Render environment variables:
 
 ```text
 APP_ENV=production
+PYTHON_VERSION=3.11.11
 DATABASE_URL=postgresql+psycopg://...
 OPENAI_API_KEY=...
 OPENAI_SYNTHESIS_MODEL=gpt-5-mini

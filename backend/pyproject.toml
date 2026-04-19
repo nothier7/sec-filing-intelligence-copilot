@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "sec-filing-intelligence-copilot"
 version = "0.1.0"
 description = "FastAPI backend for the SEC Filing Intelligence Copilot."
-requires-python = ">=3.9"
+requires-python = ">=3.9,<3.13"
 dependencies = [
     "alembic>=1.14.0",
     "fastapi>=0.115.0",
